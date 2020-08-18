@@ -1,0 +1,310 @@
+---
+title: "C-center models"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+# Load required packages
+```{r}
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(lme4)
+library(car)
+library(visreg)
+library(optimx)
+library(lmerTest)
+```
+# Introduction 
+From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C's is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we've included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable 'time.lag' is the time normalized (on a 0-1 scale) lag between consonant and vowel. 
+
+## Read data
+```{r save data}
+load("modelling_data_rightedge.Rda")
+```
+
+## Convert factors and subset data
+```{r remove NA}
+# convert to factors/numeric:
+df.rightedge$condition <- as.factor(df.rightedge$condition)
+
+# remove all the recordings without a speech rate measure:
+df.rightedge <- df.rightedge %>% drop_na(duration.tt)
+
+# create df without spr:
+df.rightedge.nospr <- df.rightedge[! df.rightedge$cluster == "spr", ]
+df.rightedge.nospr <- droplevels(df.rightedge.nospr)
+levels(df.rightedge.nospr$cluster)
+
+# create df without sx:
+#df.rightedge <- df.rightedge[! df.rightedge$cluster == "sx", ]
+#df.rightedge <- droplevels(df.rightedge)
+#levels(df.rightedge$cluster)
+
+```
+
+
+# LME models for rightward shift rightmost C
+In a CCV complex onset the rightmost C in the onset should show a rightward shift towards the vowel in comparison to the C in a CV onset. We hypothesize that this shift may be less pronounced for the patient group, as they may show a stronger preference for inphase coordination. In this analysis we compare /sp/ to /p/, /sm/ to /m/, /sx/ to /x/ and /spr/ to /pr/. As a start, I've included the 'cluster' variable and the 'condition' (simple vs. complex onset) variable.
+
+## Some plots
+```{r}
+#right edge shift
+ggplot(df.rightedge, aes(x=group, y=time.lag, fill=condition)) + geom_violin() + labs(title = "Over all clusters", y = "Distance to anchor")
+dodge <- position_dodge(width = 0.9)
+
+ggplot(df.rightedge[df.rightedge$cluster == "sp",], aes(x=group, y=time.lag, fill=condition)) + geom_violin(trim=FALSE) + labs(title = "/sp/", y = "Distance to anchor") + geom_boxplot(width=.2, position = dodge) 
+
+ggplot(df.rightedge[df.rightedge$cluster == "sm",], aes(x=group, y=time.lag, fill=condition)) + geom_violin(trim=FALSE) + labs(title = "/sm/", y = "Distance to anchor") + geom_boxplot(width=.2, position = dodge) 
+
+ggplot(df.rightedge[df.rightedge$cluster == "spr",], aes(x=group, y=time.lag, fill=condition)) + geom_violin(trim=FALSE) + labs(title = "/spr/", y = "Distance to anchor") + geom_boxplot(width=.2, position = dodge) 
+
+```
+
+## Hypothesis testing
+
+summary(test <- lmer(duration.tt ~ group + (1|subj), data=df.rightedge))
+
+
+Fitting first model:
+```{r}
+summary(m <- lmer(time.lag ~ (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$varcor
+```
+
+Adding cluster as fixed effect:
+```{r}
+summary(m1 <- lmer(time.lag ~ cluster + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m, m1)
+```
+Sign. improvement.
+
+Adding condition as fixed effect:
+```{r}
+summary(m2 <- lmer(time.lag ~ condition + cluster + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m1, m2)
+```
+Sign. improvement.
+
+Adding speech rate as fixed effect:
+```{r}
+summary(m3 <- lmer(time.lag ~ condition + cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m2, m3)
+```
+Sign. improvement.
+
+```{r}
+summary(m3.dur.con.inter <- lmer(time.lag ~ condition + cluster + duration.tt*condition + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m2, m3)
+```
+
+Adding group as fixed effect:
+```{r}
+summary(m4 <- lmer(time.lag ~ condition + cluster + duration.tt + group + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m3, m4)
+```
+No improvement.
+
+Adding condition:cluster as fixed effect.
+```{r}
+summary(m5 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m3, m5)
+```
+Sign. improvement, especially due to /spr/ cluster.
+
+Check whether we need to include condition:cluster in the random structure.
+```{r}
+summary(m6 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+condition*cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa",optCtrl=list(maxfun=2e5))))$coef
+```
+Fails to converge. Continue with m5.
+
+Adding group:condition as fixed effect.
+```{r}
+summary(m7 <- lmer(time.lag ~ group*condition + condition*cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m7) # is this a correct comparison?
+```
+No improvement.
+
+Adding threeway interaction group:condition:cluster.
+```{r}
+summary(m8 <- lmer(time.lag ~ group*condition*cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m8) # is this a correct comparison?
+```
+No improvement.
+
+Check whether we need random slopes for condition:
+```{r}
+summary(m9 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+cluster|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m9, refit=F)
+```
+We do need the random slope.
+
+Check whether we really need random slopes for cluster:
+```{r}
+summary(m10 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+condition|subj), data=df.rightedge, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m10, refit=F)
+```
+Again, we do need the random slope.
+
+
+### Visualize final model:
+```{r}
+visreg(m5, "cluster", by = "condition", overlay = T, points = list(cex = 0.1), ylab = "time lag (ms)")
+```
+
+## Models with /spr/ cluster
+
+
+Fitting first model:
+```{r}
+summary(m <- lmer(time.lag ~ (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$varcor
+```
+
+Adding cluster as fixed effect:
+```{r}
+summary(m1 <- lmer(time.lag ~ cluster + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m, m1)
+```
+Sign. improvement.
+
+Adding condition as fixed effect:
+```{r}
+summary(m2 <- lmer(time.lag ~ condition + cluster + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m1, m2)
+```
+Sign. improvement.
+
+Adding speech rate as fixed effect:
+```{r}
+summary(m3 <- lmer(time.lag ~ condition + cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m2, m3)
+```
+Sign. improvement.
+```{r}
+df.rightedge.nospr$duration.tt.c <- scale(df.rightedge.nospr$duration.tt, scale = F)
+```
+summary(m3.inter.con.dur <- lmer(time.lag ~ condition*duration.tt + cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+summary(mh.df2 <- lmer(time.lag ~ condition*group + duration.tt.c + (1+condition|subj), data=df2, control = lmerControl(optimizer = "bobyqa")))$coef
+summary(m3.inter.gro.dur <- lmer(time.lag ~ condition + duration.tt.c*group + cluster + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+```{r}
+summary(m3.inter.gro.dur.con <- lmer(time.lag ~ duration.tt*group*condition + cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+```
+
+
+Adding group as fixed effect:
+```{r}
+summary(m4 <- lmer(time.lag ~ condition + cluster + duration.tt + group + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m3, m4)
+```
+No improvement.
+
+Adding condition:cluster as fixed effect.
+```{r}
+summary(m5 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m3, m5)
+```
+Sign. improvement.
+
+Check whether we need to include condition:cluster in the random structure.
+```{r}
+summary(m6 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+condition*cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa",optCtrl=list(maxfun=2e5))))$coef
+```
+Fails to converge. Continue with m5.
+
+Adding group:condition as fixed effect.
+```{r}
+summary(m7 <- lmer(time.lag ~ group*condition + condition*cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m7) # is this a correct comparison?
+```
+No improvement.
+
+Adding threeway interaction group:condition:cluster.
+```{r}
+summary(m8 <- lmer(time.lag ~ group*condition*cluster + duration.tt + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m8) # is this a correct comparison?
+```
+No improvement.
+
+Check whether we need random slopes for condition:
+```{r}
+summary(m9 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m9, refit=F)
+```
+We do need the random slope.
+
+Check whether we really need random slopes for cluster:
+```{r}
+summary(m10 <- lmer(time.lag ~ condition*cluster + duration.tt + (1+condition|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+anova(m5, m10, refit=F)
+```
+Again, we do need the random slope.
+
+
+Visualize final model:
+```{r}
+visreg(m5, "cluster", by = "condition", overlay = T, points = list(cex = 0.1), ylab = "time lag (ms)")
+```
+
+## Exploratory analysis
+Centering and adding recording.no as fixed effect:
+```{r}
+summary(m3.inter.gro.dur <- lmer(time.lag ~ condition + duration.tt.c*group + cluster + (1+condition + cluster|subj), data=df.rightedge.nospr, control = lmerControl(optimizer = "bobyqa")))$coef
+```
+Significant improvement.
+
+Adding recording.no as random slope:
+```{r}
+
+```
+Convergence error: too complex.
+
+Adding gender as fixed effect:
+```{r}
+
+```
+No improvement.
+
+Adding dialect as fixed effect:
+```{r}
+
+```
+No improvement. 
+
+Adding age as fixed effect:
+```{r}
+
+```
+No improvement.
+
+Visualize final model:
+```{r}
+```
+
+## Checking Assumptions
+
+Check multicollinearity:
+```{r}
+#vif(m10) # OK, all lower than 5
+```
+
+Check autocorrelation:
+```{r}
+#acf(resid(m10)) # OK
+```
+
+Check normality residuals:
+```{r}
+#qnorm(resid(m10)) 
+#qqline(resid(m10)) # doesn't look OK, short tailed?
+```
+
+Check hetereoscedasticity:
+```{r}
+#plot(fitted(m10), resid(m10)) # looks OK
+```
+
+
