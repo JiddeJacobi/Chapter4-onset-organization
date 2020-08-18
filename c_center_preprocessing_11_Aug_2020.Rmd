@@ -47,8 +47,8 @@ df<- df %>%
 
 Drop unwanted columns.
 ```{r}
-drop <- c("project", "remove","remove2", "X")
-df = df[!(names(df) %in% drop)]
+df <- df %>%
+select(-c(project, remove, remove2, x1, x2, x3, x4, x5, x6, x7, y1, y2, y3, y4, y5, y6, y7, z1, z2, z3, z4, z5, z6, z7, v1, v2, v3, v4, v5, v6, v7, X.1, X.2, X.3, DOns, DTarg, DOff))
 ```
 
 Create new variable recording.no to indicate the recording number (first recording, second recording etc..).
@@ -79,7 +79,10 @@ df$group <-  as.factor(df$group)
 
 Create condition based on prompt.
 ```{r}
-df$condition <- ifelse(df$prompt == "oma spat" | df$prompt == "opa schat" | df$prompt == "opa Smat" | df$prompt == "oma sprak", "complex", "simple")
+df$condition <- "C"
+df$condition[df$prompt == "oma spat" | df$prompt == "opa Smat" |df$prompt == "opa schat" | df$prompt == "oma's prak"] <- "CC"
+df$condition[df$prompt == "oma sprak"] <- "CCC"
+df$condition <-  as.factor(df$condition)
 ```
 
 Create cluster column.
@@ -100,6 +103,7 @@ df <- df[is.na(df$outl),]
 Check whether the conditions are well coded and whether the segmentation involves the correct articulators.
 ```{r}
 table(df$prompt, df$condition)
+table(df$prompt, df$cluster)
 table(df$seg, df$traj)
 ```
 
@@ -250,7 +254,7 @@ rm(sm, sp, sx, spr)
 ```
 
 
-Plots
+Plots over all speakers
 ```{r plots rightedge}
 dodge <- position_dodge(width = 0.9)
 
@@ -268,6 +272,12 @@ ggplot(df.rightedge[df.rightedge$cluster == "sx",], aes(x=group, y=time.lag, fil
 
 #/spr/
 ggplot(df.rightedge[df.rightedge$cluster == "spr",], aes(x=group, y=time.lag, fill=condition)) + geom_violin() + labs(title = "spr", y = "Lag (ms)") + geom_boxplot(width=.2, position = dodge)
+```
+Plots per speakers
+```{r plots per speaker}
+ggplot(df.rightedge[df.rightedge$group == "CTRL" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster != "sx",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "CTRL, /prak/ and /sx/ clusters excluded", y = "Lag (ms)") + geom_boxplot(width=.2, position = dodge)
+
+ggplot(df.rightedge[df.rightedge$group == "PD" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster != "sx",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "PD, /prak/ and /sx/ clusters excluded", y = "Lag (ms)") + geom_boxplot(width=.2, position = dodge)
 ```
 
 
@@ -366,7 +376,36 @@ sx.CC <- na.omit(sx.CC, cols="time.lag")
 # plot
 ggplot(sx.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /sx/", y = "Lag between C's (ms)")
 ```
+/pr/ CC lag
+```{r}
+# collect offset times /s/
+offset.p <- df %>%
+  filter(prompt == "oma's prak") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "p") %>%
+  select(subj, recording.no, t5) %>%
+  rename(t5.p = t5)
 
+# collect onset times /x/
+pr.CC <- df %>%
+  filter(prompt == "oma's prak") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "r") %>%
+  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3) %>%
+  rename(t3.r = t3)  %>%
+  inner_join(offset.p, by=c("subj", "recording.no")) %>%
+  mutate(time.lag = t3.r-t5.p)
+
+rm(offset.p)
+
+# getting rid of NA's
+pr.CC <- na.omit(pr.CC, cols="time.lag")
+
+# plot
+ggplot(pr.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /pr/", y = "Lag between C's (ms)")
+```
 
 /spr/ CC lag
 ```{r}
@@ -403,15 +442,18 @@ ggplot(spr.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() 
 
 Merge.
 ```{r merge}
-df.CC.lag<- rbind(sm.CC, sp.CC, sx.CC, spr.CC)
-rm(sm.CC, sp.CC, sx.CC, spr.CC)
+df.CC.lag<- rbind(sm.CC, sp.CC, sx.CC, pr.CC, spr.CC)
+rm(sm.CC, sp.CC, sx.CC, pr.CC, spr.CC)
 ```
 
 
 ## Some plots
 ```{r plots}
-ggplot(df.CC.lag, aes(x=cluster, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag all clusters", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
-
+ggplot(df.CC.lag, aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag all clusters", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$cluster == "sp",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag /sp/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$cluster == "sm",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag /sm/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$prompt == "oma's prak",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC /pr/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$prompt == "oma sprak",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag /spr/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
 ```
 
 # Save data
