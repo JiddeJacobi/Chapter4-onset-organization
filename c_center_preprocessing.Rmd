@@ -1124,8 +1124,8 @@ df.RSD.long <- df.RSD %>%
   select(subj, group, cluster, condition, RSD) %>%
   arrange(subj, group, cluster, condition, RSD)
 
-df.RSD.long$subj <- droplevels(RSD.long$subj)
-df.RSD.long$condition <- as.factor(RSD.long$condition)
+df.RSD.long$subj <- droplevels(df.RSD.long$subj)
+df.RSD.long$condition <- as.factor(df.RSD.long$condition)
 
 #ezANOVA(RSD.long, dv=value, wid=subj, within=condition, between=group)
 
