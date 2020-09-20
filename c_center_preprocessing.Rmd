@@ -22,11 +22,12 @@ library("tidyr")
 library("ggplot2")
 library("stringr")
 library("tigerstats")
+library("ez")
 ```
 
 ## Read data
 ```{r read}
-df <- read.csv("../data/c-center_28th_Aug.csv", header = TRUE, sep = ",")
+df <- read.csv("../data/c-center_16th_Sep.csv", header = TRUE, sep = ",")
 load("../data/speech_rate.Rda")
 ```
 
@@ -114,370 +115,217 @@ df <- df[!(df$subj == "PD25" & df$cluster == "sx"),]
 ```
 
 
-# Preparing data for rightedge analysis
-Here we compute the durations between the offset of the vowel's preceding consonant and the onset of the vowel's following consonant (i.e. the anchor).
-
-/sp/ environment
-```{r sp}
-# collect onset times coda /t/ (end of word)
-onset.t <- df %>%
-  filter(prompt == "oma spat" | prompt == "oma's pad" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "t") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.t = t3)
-
-# collect offset times /p/ (gesture of interest), merge dataframes and time normalize (0,1) the offset of /p/
-sp <- df %>%
-  filter(prompt == "oma spat" | prompt == "oma's pad" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "p") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t5) %>%
-  rename(t5.p = t5) %>%
-  inner_join(onset.t, by = c("subj", "recording.no", "prompt", "block", "condition", "group", "cluster", "duration.tt", "duration.mt")) %>%
-  mutate(time.lag = t3.t-t5.p) 
-
-  rm(onset.t)
-
-# getting rid of NA's
-sp <- na.omit(sp, cols="time.lag")
-
-# plot
-ggplot(sp[sp$group == "CTRL",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "CTRL: /sp/", y = "Distance to anchor (ms)")
-ggplot(sp[sp$group == "PD",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "PD: /sp/", y = "Distance to anchor (ms)")
-```
-
-/sm/ environment
-```{r sm}
-# collect onset times coda /t/ (end of word)
-onset.t <- df %>%
-  filter(prompt == "opa Smat" | prompt == "opa's mat" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "t") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.t = t3)
-
-# collect offset times /m/ (gesture of interest), merge dataframes and time normalize (0,1) the offset of /m/
-sm <- df %>%
-  filter(prompt == "opa Smat" | prompt == "opa's mat" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "m") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t5) %>%
-  rename(t5.m = t5) %>%
-  inner_join(onset.t, by = c("subj", "recording.no", "prompt", "block", "condition", "group", "cluster", "duration.tt", "duration.mt")) %>%
-  mutate(time.lag = t3.t-t5.m) 
-
-  rm(onset.t)
-  
-
-# getting rid of NA's
-sm <- na.omit(sm, cols="time.lag")
-
-# plot
-ggplot(sm[sm$group == "CTRL",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "CTRL: /sm/", y = "Distance to anchor (ms)")
-ggplot(sm[sm$group == "PD",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "PD: /sm/", y = "Distance to anchor (ms)")
-```
-
-/sx/ environment
-```{r sx}
-# collect onset times coda /t/ (end of word)
-onset.t <- df %>%
-  filter(prompt == "opa schat" | prompt == "opa's gat" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "t") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.t = t3)
-
-# collect offset times /x/ (gesture of interest), merge dataframes and time normalize (0,1) the offset of /x/
-sx <- df %>%
-  filter(prompt == "opa schat" | prompt == "opa's gat" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "X") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t5) %>%
-  rename(t5.x = t5) %>%
-  inner_join(onset.t, by = c("subj", "recording.no", "prompt", "block", "condition", "group", "cluster", "duration.tt", "duration.mt")) %>%
-  mutate(time.lag = t3.t-t5.x)  
-
-  rm(onset.t)
-  
-# getting rid of NA's
-sx <- na.omit(sx, cols="time.lag")
-
-# plot
-ggplot(sx[sx$group == "CTRL",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "CTRL: /sx/", y = "Distance to anchor (ms)")
-ggplot(sx[sx$group == "PD",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "PD: /sx/", y = "Distance to anchor (ms)")
-```
-
-/spr/ environment
-```{r spr}
-# collect onset times coda /k/ (end of word)
-onset.k <- df %>%
-  filter(prompt == "oma sprak" | prompt == "oma's prak" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "k") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.k = t3)
-
-# collect offset times /r/ (gesture of interest), merge dataframes and time normalize (0,1) the offset of /r/
-spr <- df %>%
-  filter(prompt == "oma sprak" | prompt == "oma's prak" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "r") %>%
-  select(subj, recording.no, prompt, block, condition, seg, group, cluster, duration.tt, duration.mt,  t5) %>%
-  rename(t5.r = t5) %>%
-  inner_join(onset.k, by = c("subj", "recording.no", "prompt", "block", "condition", "group", "cluster", "duration.tt", "duration.mt")) %>%
-  mutate(time.lag = t3.k-t5.r)  
-
-  rm(onset.k)
-  
-
-# getting rid of NA's
-spr <- na.omit(spr, cols="time.lag")
-
-# plot
-ggplot(spr[spr$group == "CTRL",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "CTRL: /spr/", y = "Distance to anchor (ms)")
-ggplot(spr[spr$group == "PD",], aes(x=subj, y=time.lag, fill=condition)) + geom_boxplot() + labs(title = "PD: /spr/", y = "Distance to anchor (ms)")
-```
-
-Merge clusters into new dataframe.
-```{r merge rightedge}
-df.rightedge <- rbind(sm, sp, sx, spr)
-# df.rightedge <- unique(df.rightedge[,c("subj", "group", "condition","cluster","mean.lag.prompt.norm")])
-rm(sm, sp, sx, spr)
-```
-
-## Plots
-### Plots over all speakers
-```{r plots rightedge}
-dodge <- position_dodge(width = 0.9)
-
-#right edge shift
-ggplot(df.rightedge, aes(x=group, y=time.lag, fill=condition)) + geom_violin() + labs(title = "Over all clusters", y = "Distance to anchor") + geom_boxplot(width=.2, position = dodge)
-
-#/sp/
-ggplot(df.rightedge[df.rightedge$cluster == "sp",], aes(x=group, y=time.lag, fill=condition)) + geom_violin() + labs(title = "sp", y = "Lag (ms)") + geom_boxplot(width=.2, position = dodge)
-
-#/sm/
-ggplot(df.rightedge[df.rightedge$cluster == "sm",], aes(x=group, y=time.lag, fill=condition)) + geom_violin() + labs(title = "sm", y = "Lag (ms)") + geom_boxplot(width=.2, position = dodge)
-
-#/sX/
-ggplot(df.rightedge[df.rightedge$cluster == "sx",], aes(x=group, y=time.lag, fill=condition)) + geom_violin() + labs(title = "sx", y = "Lag (ms)") + geom_boxplot(width=.2, position = dodge)
-
-#/spr/
-ggplot(df.rightedge[df.rightedge$cluster == "spr",], aes(x=group, y=time.lag, fill=condition)) + geom_violin() + labs(title = "spr", y = "Lag (ms)") + geom_boxplot(width=.2, position = dodge)
-```
-### Plots per speakers
-
-/sp/
-```{r /sp/ plots per speaker}
-ggplot(df.rightedge[df.rightedge$group == "CTRL" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sp",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/sp/, CTRL") + geom_boxplot()
-
-ggplot(df.rightedge[df.rightedge$group == "PD" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sp",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/sp/, PD, ", y = "Lag (ms)") + geom_boxplot()
-```
-
-/sm/
-```{r /sm/ plots per speaker}
-ggplot(df.rightedge[df.rightedge$group == "CTRL" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sm",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/sm/, CTRL", y = "Lag (ms)") + geom_boxplot()
-
-ggplot(df.rightedge[df.rightedge$group == "PD" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sm",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/sm/, PD", y = "Lag (ms)") + geom_boxplot()
-```
-
-/sx/
-```{r /sx/ plots per speaker}
-ggplot(df.rightedge[df.rightedge$group == "CTRL" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sx",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/sx/, CTRL", y = "Lag (ms)") + geom_boxplot()
-
-ggplot(df.rightedge[df.rightedge$group == "PD" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sx",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/sx/, PD", y = "Lag (ms)") + geom_boxplot()
-```
-
-/spr/
-```{r /spr/ plots per speaker}
-ggplot(df.rightedge[df.rightedge$group == "CTRL" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sp",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/spr/, CTRL", y = "Lag (ms)") + geom_boxplot()
-
-ggplot(df.rightedge[df.rightedge$group == "PD" & df.rightedge$prompt != "oma's prak" & df.rightedge$cluster == "sp",], aes(x=subj, y=time.lag, fill=condition)) + labs(title = "/spr/, PD", y = "Lag (ms)") + geom_boxplot()
-```
-
-
 # Preparing data for within cluster analysis
 
 /sp/ CC lag
 ```{r sp CC lag}
 # collect offset times /s/
 offset.s <- df %>%
+  rowwise() %>%
   filter(prompt == "oma spat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  select(subj, recording.no, t5) %>%
+  select(subj, recording.no, t3, t5) %>%
+  rename(t3.s = t3) %>%
   rename(t5.s = t5) 
 
 # collect onset times /p/ and merge df's
 sp.CC <- df %>%
+  rowwise() %>%
   filter(prompt == "oma spat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
-  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3) %>%
+  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3, t5) %>%
   rename(t3.p = t3) %>%
+  rename(t5.p = t5) %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
-  mutate(time.lag = t3.p-t5.s)
+  mutate(time.lag = t3.p-t5.s)  %>%
+  mutate(time.lag.norm = time.lag/(t5.p - t3.s))  %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.p - t3.s)) %>%
+  mutate(dur.C2.norm = (t5.p - t3.p)/(t5.p - t3.s))
+
+
+plot(sp.CC$time.lag.norm, sp.CC$dur.C2.norm)
+cor(sp.CC$time.lag.norm, sp.CC$dur.C2.norm, use = "complete.obs")
+
+plot(sp.CC$time.lag.norm[sp.CC$group == "CTRL"], sp.CC$dur.C1.norm[sp.CC$group == "CTRL"])
+plot(sp.CC$time.lag.norm[sp.CC$group == "PD"], sp.CC$dur.C1.norm[sp.CC$group == "PD"])
 
 rm(offset.s)
 
 # getting rid of NA's
-sp.CC <- na.omit(sp.CC, cols="time.lag")
+sp.CC <- na.omit(sp.CC, cols="time.lag.norm")
 
 # plot
-ggplot(sp.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "CTRL: /sp/", y = "Lag between C's (ms)")
+ggplot(sp.CC, aes(x=subj, y=time.lag.norm, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "CTRL: /sp/", y = "Lag between C's")
 ```
 
 /sm/ CC lag
 ```{r sm CC lag}
 # collect  offset times /s/
 offset.s <- df %>%
+  rowwise() %>%
   filter(prompt == "opa Smat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  select(subj, recording.no, t5) %>%
-  rename(t5.s = t5)
+  select(subj, recording.no, t3, t5) %>%
+  rename(t5.s = t5, t3.s = t3)
   
 # collect offset times /m/
 sm.CC <- df %>%
+  rowwise() %>%
   filter(prompt == "opa Smat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "m") %>%
-  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.m = t3)  %>%
+  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3, t5) %>%
+  rename(t3.m = t3, t5.m = t5)  %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
-  mutate(time.lag = t3.m-t5.s)
+  mutate(time.lag = t3.m-t5.s) %>%
+  mutate(time.lag.norm = time.lag/(t5.m - t3.s))  %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.m - t3.s))  %>%
+  mutate(dur.C2.norm = (t5.m - t3.m)/(t5.m - t3.s))
+
+
+plot(sm.CC$time.lag.norm, sm.CC$dur.C2.norm)
+cor(sm.CC$time.lag.norm, sm.CC$dur.C2.norm, use = "complete.obs")
+
+plot(sm.CC$time.lag.norm[sm.CC$group == "CTRL"], sm.CC$dur.C1.norm[sm.CC$group == "CTRL"], use = "complete.obs")
+plot(sm.CC$time.lag.norm[sm.CC$group == "PD"], sm.CC$dur.C1.norm[sm.CC$group == "PD"], use = "complete.obs")
+
 
 rm(offset.s)
 
 # getting rid of NA's
-sm.CC <- na.omit(sm.CC, cols="time.lag")
+sm.CC <- na.omit(sm.CC, cols="time.lag.norm")
 
 # plot
-ggplot(sm.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /sm/", y = "Lag between C's (ms)")
+ggplot(sm.CC, aes(x=subj, y=time.lag.norm, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /sm/", y = "Lag between C's (ms)")
 ```
 
 /sx/ CC lag
 ```{r}
 # collect offset times /s/
 offset.s <- df %>%
+  rowwise() %>%
   filter(prompt == "opa schat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  select(subj, recording.no, t5) %>%
-  rename(t5.s = t5)
+  select(subj, recording.no, t3, t5) %>%
+  rename(t3.s = t3, t5.s = t5)
 
 # collect onset times /x/
 sx.CC <- df %>%
+  rowwise() %>%
   filter(prompt == "opa schat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "X") %>%
-  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.x = t3)  %>%
+  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3, t5) %>%
+  rename(t3.x = t3, t5.x = t5)  %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
-  mutate(time.lag = t3.x-t5.s)
+  mutate(time.lag = t3.x-t5.s) %>%
+  mutate(time.lag.norm = time.lag/(t5.x - t3.s)) %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.x - t3.s))  %>%
+  mutate(dur.C2.norm = (t5.x - t3.x)/(t5.x - t3.s))
 
-rm(offset.s)
+
+plot(sx.CC$time.lag.norm, sx.CC$dur.C2.norm)
+cor(sx.CC$time.lag.norm, sx.CC$dur.C2.norm, use = "complete.obs")
+
+plot(sx.CC$time.lag.norm[sx.CC$group == "CTRL"], sx.CC$dur.C1.norm[sx.CC$group == "CTRL"])
+plot(sx.CC$time.lag.norm[sx.CC$group == "PD"], sx.CC$dur.C1.norm[sx.CC$group == "PD"])
 
 # getting rid of NA's
-sx.CC <- na.omit(sx.CC, cols="time.lag")
+sx.CC <- na.omit(sx.CC, cols="time.lag.norm")
 
 
 # plot
-ggplot(sx.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /sx/", y = "Lag between C's (ms)")
+ggplot(sx.CC, aes(x=subj, y=time.lag.norm, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /sx/", y = "Lag between C's (ms)")
 ```
-/pr/ CC lag
+
+/s-r/ CC lag
 ```{r}
-# collect offset times /s/
+# collect on and offset times /s/
+offset.s <- df %>%
+  rowwise() %>%
+  filter(prompt == "oma's prak") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "s") %>%
+  select(subj, recording.no, t3, t5) %>%
+  rename(t3.s = t3, t5.s = t5)
+
+# collect on and offset times /p/
 offset.p <- df %>%
+  rowwise() %>%
   filter(prompt == "oma's prak") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
-  select(subj, recording.no, t5) %>%
-  rename(t5.p = t5)
+  select(subj, recording.no, t3, t5) %>%
+  rename(t3.p = t3, t5.p = t5)
 
-# collect onset times /x/
-pr.CC <- df %>%
+# collect on and offset times /r/
+spr.CC <- df %>%
+  rowwise() %>%
   filter(prompt == "oma's prak") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "r") %>%
-  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.r = t3)  %>%
-  inner_join(offset.p, by=c("subj", "recording.no")) %>%
-  mutate(time.lag = t3.r-t5.p)
-
-rm(offset.p)
-
-# getting rid of NA's
-pr.CC <- na.omit(pr.CC, cols="time.lag")
-
-# plot
-ggplot(pr.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /pr/", y = "Lag between C's (ms)")
-```
-
-/spr/ CC lag
-```{r}
-# collect normalized offset times /s/
-offset.s <- df %>%
-  filter(prompt == "oma sprak") %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "s") %>%
-  select(subj, recording.no, t5) %>%
-  rename(t5.s = t5)  
-
-# collect normalized offset times /r/
-spr.CC <- df %>%
-  filter(prompt == "oma sprak") %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "r") %>%
-  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3) %>%
-  rename(t3.r = t3)  %>%
+  select(subj, recording.no, prompt, block, condition, group, cluster, duration.tt, duration.mt,  t3, t5) %>%
+  rename(t3.r = t3, t5.r = t5)  %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
-  mutate(time.lag = t3.r-t5.s)
+  left_join(offset.p, by=c("subj", "recording.no")) %>%
+  mutate(time.lag = t3.r-t5.s) %>%
+  mutate(time.lag.norm = time.lag/(t5.r - t3.s)) %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.r - t3.s))  %>%
+  mutate(dur.C2.norm = (t5.p - t3.p)/(t5.r - t3.s))  %>%
+  mutate(dur.C3.norm = (t5.r - t3.r)/(t5.r - t3.s))
+
+
+plot(spr.CC$time.lag.norm, spr.CC$dur.C2.norm)
+cor(spr.CC$time.lag.norm, spr.CC$dur.C2.norm, use = "complete.obs")  
+
+plot(spr.CC$time.lag.norm, spr.CC$dur.C3.norm)
+cor(spr.CC$time.lag.norm, spr.CC$dur.C3.norm, use = "complete.obs")
+
+cor(spr.CC$time.lag.norm[spr.CC$group == "CTRL"], spr.CC$dur.C1.norm[spr.CC$group == "CTRL"])
+cor(spr.CC$time.lag.norm[spr.CC$group == "PD"], spr.CC$dur.C1.norm[spr.CC$group == "PD"])
+
+plot(spr.CC$time.lag.norm[spr.CC$group == "CTRL"], spr.CC$dur.C1.norm[spr.CC$group == "CTRL"])
+plot(spr.CC$time.lag.norm[spr.CC$group == "PD"], spr.CC$dur.C1.norm[spr.CC$group == "PD"])
 
 rm(offset.s)
 
-
 # getting rid of NA's
-spr.CC <- na.omit(spr.CC, cols="time.lag")
-
+spr.CC <- na.omit(spr.CC, cols="time.lag.norm")
 
 # plot
-ggplot(spr.CC, aes(x=subj, y=time.lag, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "CTRL: /spr/", y = "Lag between C's (ms)")
+ggplot(spr.CC, aes(x=subj, y=time.lag.norm, fill=group, na.rm = T)) + geom_boxplot() + labs(title = "PD: /spr/", y = "Lag between /s/ and /r/ (ms)")
 ```
 
 Merge.
 ```{r merge}
-df.CC.lag<- rbind(sm.CC, sp.CC, sx.CC, pr.CC, spr.CC)
-rm(sm.CC, sp.CC, sx.CC, pr.CC, spr.CC)
+df.CC.lag<- rbind(sm.CC, sp.CC, sx.CC, spr.CC)
+rm(sm.CC, sp.CC, sx.CC, spr.CC)
 ```
 
 
 ## Some plots
 ```{r plots}
+dodge <- position_dodge(width = 0.9)
+
 ggplot(df.CC.lag, aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag all clusters", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
-ggplot(df.CC.lag[df.CC.lag$cluster == "sp",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag /sp/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
-ggplot(df.CC.lag[df.CC.lag$cluster == "sm",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag /sm/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
-ggplot(df.CC.lag[df.CC.lag$prompt == "oma's prak",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag /pr/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
-ggplot(df.CC.lag[df.CC.lag$prompt == "oma sprak",], aes(x=condition, y=time.lag, fill=group)) + geom_violin() + labs(title = "CC lag /spr/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$cluster == "sp",], aes(x=condition, y=time.lag.norm, fill=group)) + geom_violin() + labs(title = "CC lag /sp/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$cluster == "sm",], aes(x=condition, y=time.lag.norm, fill=group)) + geom_violin() + labs(title = "CC lag /sm/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$cluster == "sx",], aes(x=condition, y=time.lag.norm, fill=group)) + geom_violin() + labs(title = "CC lag /sx/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
+ggplot(df.CC.lag[df.CC.lag$cluster == "spr",], aes(x=condition, y=time.lag.norm, fill=group)) + geom_violin() + labs(title = "CC lag /spr/", y = "Lag between /s/ and /r/") + geom_boxplot(width=.2, position = dodge)
+
 ```
 
 
@@ -485,18 +333,53 @@ ggplot(df.CC.lag[df.CC.lag$prompt == "oma sprak",], aes(x=condition, y=time.lag,
 ```{r}
 df <- df %>%
     rowwise() %>%
-    mutate(dur=t5 - t3) 
+    mutate(dur=t5 - t3) %>%
+    group_by(subj, cluster,  seg) %>%
+    mutate(norm.dur = scale(dur))
+
+
+mean.dur.C <- df %>%
+  group_by(cluster, condition, subj) %>%
+  filter(condition == "C") %>%
+  filter(seg == "p"| seg == "m" | seg == "X") %>%
+  group_by(seg) %>%
+  select(cluster, condition, subj, seg, dur) %>%
+  mutate(mean.dur.C = mean(dur, na.rm=T)) %>%
+  distinct(subj, seg, mean.dur.C)
+
+diff <- df %>%
+  group_by(cluster, condition, subj) %>%
+  filter(condition == "CC") %>%
+  filter(seg == "p"| seg == "m" | seg == "X") %>%
+  group_by(seg, subj) %>%
+  select(cluster, condition, subj, seg, dur) %>%
+  mutate(mean.dur.CC = mean(dur, na.rm=T)) %>%
+  distinct(subj, seg, mean.dur.CC) %>%
+  inner_join(mean.dur.C, by=c("subj", "seg")) %>%
+  mutate(diff = mean.dur.C - mean.dur.CC)
+
+diff %>%
+  group_by(seg) %>%
+  summarize(mean = mean(diff, na.rm=T), sd = sd(diff, na.rm=T))
+
+
 ```
 
 Plot durations of right C per group:
 ```{r}
-ggplot(df[df$cluster == 'sm' & df$seg == "m",], aes(x=group, y=dur, fill=condition)) + geom_violin() + labs(title = "duration /m/", y = "duration") + geom_boxplot(width=.2, position = dodge) + ylim(0, 300)
+require(gridExtra)
 
-ggplot(df[df$cluster == 'sp' & df$seg == "p",], aes(x=group, y=dur, fill=condition)) + geom_violin() + labs(title = "duration /p/", y = "duration") + geom_boxplot(width=.2, position = dodge) + ylim(0, 300)
+plot1 <-  ggplot(df[df$cluster == 'sp' & df$seg == "p",], aes(x=group, y=norm.dur, fill=condition)) + labs(title = "Duration /p/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
 
-ggplot(df[df$cluster == 'sx' & df$seg == "X",], aes(x=group, y=dur, fill=condition)) + geom_violin() + labs(title = "duration /x/", y = "duration") + geom_boxplot(width=.2, position = dodge) + ylim(0, 300)
+plot2 <- ggplot(df[df$cluster == 'sm' & df$seg == "m",], aes(x=group, y=norm.dur, fill=condition)) + labs(title = "Duration /m/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
 
-ggplot(df[df$cluster == 'spr' & df$seg == "r",], aes(x=group, y=dur, fill=condition)) + geom_violin() + labs(title = "duration /r/", y = "duration") + geom_boxplot(width=.2, position = dodge) + ylim(0, 300)
+plot3 <-  ggplot(df[df$cluster == 'sx' & df$seg == "X",], aes(x=group, y=norm.dur, fill=condition))  + labs(title = "Duration /x/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
+
+plot4 <-  ggplot(df[df$cluster == 'spr' & df$seg == "r",], aes(x=group, y=norm.dur, fill=condition)) + labs(title = "Duration /r/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
+
+grid.arrange(plot1, plot2, plot3, plot4, ncol=2)
+rm(plot1, plot2, plot3, plot4)
+
 ```
 
 Plot durations of right C per subject:
@@ -535,6 +418,35 @@ ggplot(df[df$group == 'CTRL' & df$cluster == 'sp' & df$seg != "ɑ" & df$seg != "
 
 ggplot(df[df$group == 'PD' & df$cluster == 'sp' & df$seg != "ɑ" & df$seg != "t" & df$condition == "CC",], aes(x=subj, y=dur, fill=seg)) + geom_violin() + labs(title = "duration /s/ and /p/ in CC, PD", y = "duration") + geom_boxplot(width=.2, position = dodge) + ylim(0, 300)
 ```
+## Density plots duration
+
+```{r}
+
+ggplot(df[df$cluster == 'sp' & df$seg == "p" & df$group == "CTRL",], aes(x=dur, fill = condition)) +
+geom_density(alpha=0.4) +  ggtitle("Distribution duration /p/, CTRL") + xlim(0, 200)
+
+ggplot(df[df$cluster == 'sp' & df$seg == "p" & df$group == "PD",], aes(x=dur, fill = condition)) +
+geom_density(alpha=0.4) +  ggtitle("Distribution duration /p/, PD") + xlim(0, 200)
+
+
+ggplot(df[df$cluster == 'sm' & df$seg == "m" & df$group == "CTRL",], aes(x=dur, fill = condition)) +
+geom_density(alpha=0.4) +  ggtitle("Distribution duration /m/, CTRL") + xlim(0, 200)
+
+
+ggplot(df[df$cluster == 'sm' & df$seg == "m" & df$group == "PD",], aes(x=dur, fill = condition)) +
+geom_density(alpha=0.4) +  ggtitle("Distribution duration /m/, PD") + xlim(0, 200)
+
+
+ggplot(df[df$cluster == 'sx' & df$seg == "X" & df$group == "CTRL",], aes(x=dur, fill = condition)) +
+geom_density(alpha=0.4) +  ggtitle("Distribution duration /x/, CTRL") + xlim(0, 200)
+
+
+ggplot(df[df$cluster == 'sx' & df$seg == "X" & df$group == "PD",], aes(x=dur, fill = condition)) +
+geom_density(alpha=0.4) +  ggtitle("Distribution duration /x/, PD") + xlim(0, 200)
+  
+```
+
+
 
 # Examining landmarks
 
@@ -628,13 +540,13 @@ sp.rightedge <- df %>%
 
 Get leftedge /sp/ 
 ```{r}
-# collect offset times /p/ 
+# collect onset times /s/ 
  sp.leftedge.CC <- df %>%
   filter(prompt == "oma spat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
@@ -646,7 +558,7 @@ sp.leftedge.C <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
@@ -688,16 +600,16 @@ mid.nuc.m <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "m") %>%
-  rename(mid.nuc.m = t4) %>%
+  rename(mid.nuc.m = mid.nuc) %>%
   select(subj, prompt, recording.no, mid.nuc.m)
-  
+
 # collect mid.nuc time onset /s/
 mid.nuc.s <- df %>%
   filter(prompt == "opa Smat") %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  rename(mid.nuc.s = t4) %>%
+  rename(mid.nuc.s = mid.nuc) %>%
   select(subj, prompt, recording.no,  mid.nuc.s) 
 
 # calculate C-center
@@ -731,7 +643,7 @@ Get leftedge /sm/
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
@@ -743,25 +655,13 @@ sm.leftedge.C <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "m") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
 Merge 
 ```{r}
 sm.leftedge <- rbind(sm.leftedge.CC, sm.leftedge.C)
-```
-
-Get velocity based rightedge /sm/ 
-```{r}
-# collect offset times /m/ 
-sm.rightedge.vel <- df %>%
-  filter(prompt == "opa Smat" | prompt == "opa's mat" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
-  filter(seg == "m") %>%
-  rename(rightedge.vel = t6) %>%
-  select(subj, recording.no, rightedge.vel) 
 ```
 
 Get anchor /t/ 
@@ -797,7 +697,7 @@ mid.nuc.x <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "X") %>%
-  rename(mid.nuc.x = t4) %>%
+  rename(mid.nuc.x = mid.nuc) %>%
   select(subj, prompt, recording.no, mid.nuc.x)
   
 # collect mid.nuc time onset /s/
@@ -806,7 +706,7 @@ mid.nuc.s <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  rename(mid.nuc.s = t4) %>%
+  rename(mid.nuc.s = mid.nuc) %>%
   select(subj, prompt, recording.no,  mid.nuc.s) 
 
 # calculate C-center
@@ -841,7 +741,7 @@ Get leftedge /sx/
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
@@ -853,7 +753,7 @@ sx.leftedge.C <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "X") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
@@ -895,7 +795,7 @@ mid.nuc.r <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "r") %>%
-  rename(mid.nuc.r = t4) %>%
+  rename(mid.nuc.r = mid.nuc) %>%
   select(subj, prompt, recording.no, mid.nuc.r)
   
 # collect mid.nuc time onset /p/
@@ -904,7 +804,7 @@ mid.nuc.p <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
-  rename(mid.nuc.p = t4) %>%
+  rename(mid.nuc.p = mid.nuc) %>%
   select(subj, prompt, recording.no,  mid.nuc.p) 
 
 # collect mid.nuc time onset /s/
@@ -913,7 +813,7 @@ mid.nuc.s <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  rename(mid.nuc.s = t4) %>%
+  rename(mid.nuc.s = mid.nuc) %>%
   select(subj, prompt, recording.no,  mid.nuc.s) 
 
 # calculate C-center
@@ -948,7 +848,7 @@ spr.leftedge.CCC <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
@@ -960,7 +860,7 @@ spr.leftedge.CC <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
-  rename(leftedge = t4) %>%
+  rename(leftedge = t3) %>%
   select(subj, recording.no, leftedge) 
 ```
 
@@ -1194,29 +1094,68 @@ ggplot(df.C.center[df.C.center$cluster == 'spr' & df.C.center$group == 'PD',], a
 ```
 
 
+## Derive standard deviations
+```{r}
+df.RSD <- df.C.center %>%
+  group_by(subj, cluster) %>%
+  drop_na(leftedge.lag, rightedge.lag, c.center.lag) %>%
+  mutate(sd.leftedge = sd(leftedge.lag)) %>%
+  mutate(mean.dur.leftedge = mean(leftedge.lag)) %>%
+  mutate(RSD.leftedge = 100*sd.leftedge/mean.dur.leftedge) %>%
+
+  mutate(sd.rightedge = sd(rightedge.lag)) %>%
+  mutate(mean.dur.rightedge = mean(rightedge.lag)) %>%
+  mutate(RSD.rightedge = 100*sd.rightedge/mean.dur.rightedge) %>%
+  
+  mutate(sd.C.center = sd(c.center.lag)) %>%
+  mutate(mean.dur.C.center = mean(c.center.lag)) %>%
+  mutate(RSD.C.center = 100*sd.C.center/mean.dur.C.center) %>%
+  distinct(subj, RSD.leftedge, RSD.rightedge, RSD.C.center, .keep_all = T)
+
+
+ggplot(df.RSD, aes(x=subj, y=RSD.leftedge, fill = group)) + geom_boxplot()
+ggplot(df.RSD, aes(x=subj, y=RSD.rightedge, fill = group)) + geom_boxplot()
+ggplot(df.RSD, aes(x=subj, y=RSD.C.center, fill = group)) + geom_boxplot()
+
+#transform wide format to long format
+df.RSD.long <- df.RSD %>%
+  group_by(subj, group, cluster) %>%
+  gather(condition,RSD,c(RSD.leftedge, RSD.rightedge, RSD.C.center)) %>%
+  select(subj, group, cluster, condition, RSD) %>%
+  arrange(subj, group, cluster, condition, RSD)
+
+df.RSD.long$subj <- droplevels(RSD.long$subj)
+df.RSD.long$condition <- as.factor(RSD.long$condition)
+
+#ezANOVA(RSD.long, dv=value, wid=subj, within=condition, between=group)
+
+# display group means
+df.RSD %>%
+  group_by(group, cluster) %>%
+  summarize(mean.leftedge = mean(RSD.leftedge), sd.leftedge = sd(RSD.leftedge), mean.rightedge = mean(RSD.rightedge), sd.rightedge = sd(RSD.rightedge), mean.C.center = mean(RSD.C.center), sd.C.center = sd(RSD.C.center)) %>%
+gather(condition,value,c(mean.leftedge, mean.rightedge, mean.C.center))
+
+
+```
+
 
 # Save data
 ```{r save}
 #add meta_data
 
-setwd("/Users/45598770/Documents/analysis")
+setwd("/Users/45598770/Documents/analysis/data")
 df_meta <- read.csv("metadata.csv", header = TRUE, sep = ",")
 df_meta$gender <- as.factor(df_meta$gender)
-df.rightedge <-  merge(df.rightedge, df_meta, by="subj")
 df.CC.lag <-  merge(df.CC.lag, df_meta, by="subj")
 rm(df_meta)
 
-# Set variables that consist of most datapoints as reference variables
-df.rightedge$gender <- relevel(df.rightedge$gender, ref = "M")
-df.rightedge$group <- relevel(df.rightedge$group, ref = "CTRL")
-df.rightedge$dialect <- relevel(df.rightedge$dialect, ref = "Rest")
 
 # Set variables that consist of most datapoints as reference variables
 df.CC.lag$gender <- relevel(df.CC.lag$gender, ref = "M")
 df.CC.lag$group <- relevel(df.CC.lag$group, ref = "CTRL")
 df.CC.lag$dialect <- relevel(df.CC.lag$dialect, ref = "Rest")
 
-save(df.rightedge, file="modelling_data_rightedge.Rda")
-save(df.CC.lag, file="modelling_data_CC.Rda")
+saveRDS(df.CC.lag, file="modelling_data_CC.rds")
+saveRDS(df.RSD.long, file="modelling_data_RSD.rds")
 ```
 
