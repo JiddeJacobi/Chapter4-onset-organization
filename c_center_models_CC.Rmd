@@ -1,0 +1,176 @@
+---
+title: "C-center models"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(lme4)
+library(car)
+library(visreg)
+library(optimx)
+library(lmerTest)
+library(emmeans)
+```
+
+# Introduction
+From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C's is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we've included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable 'time.lag' is the time lag between the offset of the leftmost C and the onset of the rightmost C. If our hypothesis is correct the lag between the C's should be lower for the PD group in comparison with the controls.
+
+
+## Read data
+```{r save data}
+df <- readRDS("../data/modelling_data_CC.rds")
+```
+
+## Clean data
+Remove all the rows that have NA in the dependent variable and drop 'empty' levels, convert variables to factors and create trimmed dataset.
+```{r remove NA}
+df <- df[complete.cases(df$time.lag.norm),]
+df <- droplevels(df)
+
+# convert to factors/numeric
+df$prompt <- as.factor(df$prompt)
+df$condition <- as.factor(df$condition)
+
+# remove all the recordings without a speech rate measure:
+df <- df %>% drop_na(duration.tt)
+
+# remove participants with only a few datapoints
+#remove <- c("PD19", "CTRL19")
+#df.trim <- df[! df$subj %in% remove, ]
+#df.trim <- droplevels(df.trim)
+
+
+# create df without sx
+#df.trim <- df.trim[! df.trim$cluster == "sx", ]
+#df.trim <- droplevels(df.trim)
+#levels(df.trim$cluster)
+
+# create df without spr
+df.nospr <- df[! df$cluster == "spr", ]
+df.nospr <- droplevels(df.nospr)
+levels(df.nospr$cluster)
+
+
+# Change order of levels in cluster
+df$cluster <- factor(df$cluster, levels = c("sp", "sm", "sx", "spr"))
+```
+
+
+# LME models for CC lag analysis (coarticulation)
+If indeed patients would show a stronger preference for inphase coordination, this would mean that they would produce the C gestures in the syllable's onset closer together in time. For this, we look at the lag between the gestural offset of the leftmost C and the gestural onset of the righmost C in complex clusters.
+
+```{r}
+#CC
+dodge <- position_dodge(width = 0.9)
+ggplot(df, aes(x=group, y=time.lag.norm, fill=cluster)) + theme_bw() + geom_violin(trim=FALSE) + labs(title = "CC lag over all clusters", y = "Distance between C's") + geom_boxplot(width=.2, position = dodge) 
+```
+
+## Hypothesis testing
+
+Fitting first model:
+```{r}
+summary(m <- lmer(time.lag.norm ~ (1|subj), data=df.nospr))
+```
+
+Adding cluster as fixed effect:
+```{r}
+summary(m1 <- lmer(time.lag.norm ~ cluster + (1|subj), data=df.nospr))
+anova(m,m1)
+```
+Sign. improvement.
+
+Adding speech rate as fixed effect:
+```{r}
+summary(m2 <- lmer(time.lag.norm ~ cluster + duration.tt + (1|subj), data=df.nospr))
+anova(m1,m2)
+```
+Sign. improvement.
+
+Adding group as fixed effect:
+```{r}
+summary(m3 <- lmer(time.lag.norm ~ cluster + duration.tt + group + (1|subj), data=df.nospr))
+anova(m2,m3)
+```
+No improvement, but seems to be high overlap between group and duration.tt.
+
+Check wether we include either group or duration.tt.
+```{r}
+summary(m3b <- lmer(time.lag.norm ~ cluster + group + (1|subj), data=df.nospr))
+anova(m2,m3b)
+```
+Group has lower AIC.
+
+Adding cluster:group as fixed effect:
+```{r}
+summary(m4 <- lmer(time.lag.norm ~ cluster*group + (1|subj), data=df.nospr))
+anova(m3b,m4)
+```
+Sign. improvement.
+
+
+Add random slopes for cluster for earch participant:
+```{r}
+summary(m5 <- lmer(time.lag.norm ~ cluster*group + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="bobyqa")))
+anova(m4, m5, refit = F)
+```
+We need the random slope.
+
+### Visualize final model:
+```{r}
+visreg(m5, "cluster", by = "group", overlay = T, points = list(cex = 0.1), ylab = "Normalized time lag", xlab = "Cluster")
+```
+
+### Exploratory analysis
+
+gender
+```{r}
+summary(m6 <- lmer(time.lag.norm ~ cluster*group + gender + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="bobyqa")))
+anova(m5, m6)
+```
+No improvement.
+
+Add recording.no
+```{r}
+summary(m7 <- lmer(time.lag.norm ~ cluster*group + recording.no + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="bobyqa")))
+```
+No improvement.
+
+```{r}
+summary(m8 <- lmer(time.lag.norm ~ cluster*group + age + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="bobyqa")))
+```
+No improvement.
+
+```{r}
+summary(m9 <- lmer(time.lag.norm ~ cluster*group + dialect + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="bobyqa")))
+```
+No improvement.
+
+### Check effect of tremor and akinetic on time.lag.norm for PD group only
+```{r}
+summary(m10 <- lmer(time.lag.norm ~ cluster + tremor + (1+cluster|subj), data=df.nospr[df.nospr$group == "PD",], control=lmerControl(optimizer="bobyqa")))
+```
+No effect.
+
+```{r}
+summary(m11 <- lmer(time.lag.norm ~ cluster + akinetic + (1+cluster|subj), data=df.nospr[df.nospr$group == "PD",], control=lmerControl(optimizer="bobyqa")))
+```
+Can't converge.
+
+
+
+
