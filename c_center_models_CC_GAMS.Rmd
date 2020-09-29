@@ -27,6 +27,8 @@ library(emmeans)
 library(neldermead)
 library(ggplot2)
 library(optimx)
+library(mgcv)
+library(itsadug)
 ```
 
 # Introduction
@@ -43,6 +45,9 @@ Remove all the rows that have NA in the dependent variable and drop 'empty' leve
 ```{r remove NA}
 df <- df[complete.cases(df$time.lag.norm),]
 df <- droplevels(df)
+
+# Sort data
+df <- df[order(df$subj, df$recording.no),]
 
 # convert to factors/numeric
 df$prompt <- as.factor(df$prompt)
@@ -70,51 +75,52 @@ levels(df.nospr$cluster)
 
 # Change order of levels in cluster
 df$cluster <- factor(df$cluster, levels = c("sp", "sm", "sx", "spr"))
+
+
 ```
 
 
 # LME models for CC lag analysis (coarticulation)
 If indeed patients would show a stronger preference for inphase coordination, this would mean that they would produce the C gestures in the syllable's onset closer together in time. For this, we look at the lag between the gestural offset of the leftmost C and the gestural onset of the righmost C in complex clusters.
 
-```{r}
-#CC
-dodge <- position_dodge(width = 0.9)
-ggplot(df, aes(x=group, y=time.lag.norm, fill=cluster)) + theme_bw() + geom_violin(trim=FALSE) + labs(title = "CC lag over all clusters", y = "Distance between C's") + geom_boxplot(width=.2, position = dodge) 
-```
-
 ## Hypothesis testing
 
 Fitting first model:
 ```{r}
-summary(m <- lmer(time.lag.norm ~ (1|subj), data=df.nospr))
+summary(m <- gam(time.lag.norm ~ s(subj, bs='re'), data=df.nospr, method = "ML"))
 ```
 
 Adding cluster as fixed effect:
 ```{r}
-summary(m1 <- lmer(time.lag.norm ~ cluster + (1|subj), data=df.nospr))
-anova(m,m1)
+summary(m1 <- gam(time.lag.norm ~ s(subj,bs='re') + cluster, data=df.nospr, method = "ML"))
+compareML(m,m1)
 ```
 Sign. improvement.
 
 Adding group as fixed effect:
 ```{r}
-summary(m2 <- lmer(time.lag.norm ~ cluster + group + (1|subj), data=df.nospr))
-anova(m1,m2)
+summary(m2 <- gam(time.lag.norm ~ s(subj,bs='re') + cluster + group, data=df.nospr, method = "ML"))
+compareML(m1,m2)
 ```
-Sign. improvement. Group has lower AIC.
+Doesn't improve.
 
 Adding cluster:group as fixed effect:
 ```{r}
-summary(m3 <- lmer(time.lag.norm ~ cluster*group + (1|subj), data=df.nospr))
-anova(m2,m3)
+summary(m3 <- gam(time.lag.norm ~ s(subj,bs='re') + cluster*group, data=df.nospr, method = "ML"))
+compareML(m1,m3)
 ```
 Sign. improvement.
 
 
 Add random slopes for cluster for each participant:
 ```{r}
-summary(m4 <- lmer(time.lag.norm ~ cluster*group + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="Nelder_Mead")))
-anova(m3, m4, refit = F)
+summary(m3 <- gam(time.lag.norm ~ s(subj,bs='re') + cluster*group, data=df.nospr)) #fit m3 using REML
+
+summary(m4 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group, data=df.nospr))
+
+AIC(m3)
+AIC(m4)
+anova(m3, m4, test="Chisq")
 ```
 We need the random slope.
 
@@ -127,103 +133,72 @@ visreg(m4, "cluster", by = "group", overlay = T, points = list(cex = 0.1), ylab 
 ### Exploratory analysis
 Duration.
 ```{r}
+m4 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group, data=df.nospr, method = "ML") #fit using ML
+
 df.nospr$duration.tt <- df.nospr$duration.tt - mean(df.nospr$duration.tt) #center variable
-summary(m5 <- lmer(time.lag.norm ~ cluster*group + duration.tt + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="Nelder_Mead")))
-anova(m4, m5)
+
+summary(m5 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group + duration.tt, data=df.nospr, method = "ML"))
+compareML(m4, m5)
 ```
-Sign.improvement.
+Sign. but small improvement.
 
 Gender
 ```{r}
-summary(m6 <- lmer(time.lag.norm ~ cluster*group + gender + duration.tt  + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="Nelder_Mead")))
-anova(m5, m6)
+summary(m6 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group + duration.tt + gender, data=df.nospr, method = "ML"))
+compareML(m5, m6)
 ```
-No improvement.
+Sign. but small improvement.
 
 Add recording.no
 ```{r}
-summary(m7 <- lmer(time.lag.norm ~ cluster*group + recording.no + duration.tt + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="Nelder_Mead")))
+summary(m7 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group + duration.tt + gender + recording.no, data=df.nospr, method = "ML"))
+compareML(m6, m7)
 ```
 No improvement.
 
 Add age.
 ```{r}
-summary(m8 <- lmer(time.lag.norm ~ cluster*group + duration.tt + age + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="Nelder_Mead")))
+summary(m8 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group + duration.tt + gender + age, data=df.nospr, method = "ML"))
+compareML(m6, m8)
 ```
 No improvement.
 
 Add dialect.
 ```{r}
-summary(m9 <- lmer(time.lag.norm ~ cluster*group + duration.tt + dialect + (1+cluster|subj), data=df.nospr, control=lmerControl(optimizer="Nelder_Mead")))
+summary(m9 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group + duration.tt + gender + dialect, data=df.nospr, method = "ML"))
+compareML(m6, m9)
 ```
 No improvement.
 
 
 #### Visualize final model:
 ```{r}
-visreg(m5, "cluster", by = "group", overlay = T, points = list(cex = 0.1), ylab = "Inter plateau interval", xlab = "Cluster")
+summary(m6 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group + duration.tt + gender, data=df.nospr)) # refit using REML
+visreg(m6, "cluster", by = "group", overlay = T, points = list(cex = 0.1), ylab = "Inter plateau interval", xlab = "Cluster")
 ```
 
 #### Pairwise comparisons
 ```{r}
-emmeans(m5, specs = pairwise ~ group|cluster)
+emmeans(m6, specs = pairwise ~ group|cluster, nesting = NULL)
 ```
-
-### Checking assumptions
-```{r}
-acf(resid(m5))  # no autocorrelation
-vif(m5)  # Should be lower < 5 (for centered numerical variables): OK
-qqnorm(resid(m5)) 
-qqline(resid(m5)) #doesn't look normal
-
-# Trimming
-df.nospr2 <- df.nospr[abs(scale(resid(m5))) < 2.5, ]  # 98.5% of original data
-summary(m5.2 <- lmer(time.lag.norm ~ cluster*group + duration.tt + (1+cluster|subj), data=df.nospr2, control=lmerControl(optimizer="Nelder_Mead")))
-qqnorm(resid(m5.2)) 
-qqline(resid(m5.2)) #looks a lot better
-
-plot(resid(m5.2), fitted(m5.2))
-```
-
-
 
 
 ### Check effect of tremor and akinetic on time.lag.norm for PD group only
 Base model:
 ```{r}
-summary(m10 <- lmer(time.lag.norm ~ cluster + duration.tt + (1+cluster|subj), data=df.nospr[df.nospr$group == "PD",], control=lmerControl(optimizer="Nelder_Mead")))
+summary(m6.PD <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster + duration.tt + gender, data=df.nospr[df.nospr$group == "PD",], method = "ML"))
 ```
 
 ```{r}
-summary(m11 <- lmer(time.lag.norm ~ cluster + duration.tt + tremor + (1+cluster|subj), data=df.nospr[df.nospr$group == "PD",], control=lmerControl(optimizer="Nelder_Mead")))
-```
-No effect.
-
-Add akinetic as a fixed effect.
-```{r}
-summary(m12 <- lmer(time.lag.norm ~ cluster + duration.tt + akinetic + (1+cluster|subj), data=df.nospr[df.nospr$group == "PD",], control=lmerControl(optimizer="Nelder_Mead")))
-anova(m11, m12)
-```
-Sign. improvement.
-
-```{r}
-summary(m13 <- lmer(time.lag.norm ~ cluster*akinetic + duration.tt + (1+cluster|subj), data=df.nospr[df.nospr$group == "PD",], control=lmerControl(optimizer="Nelder_Mead")))
-anova(m12, m13)
+summary(m7.PD <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster + duration.tt + gender + tremor, data=df.nospr[df.nospr$group == "PD",], method = "ML"))
+compareML(m6.PD, m7.PD)
 ```
 No improvement.
 
-### Checking assumptions
+Add akinetic as a fixed effect.
 ```{r}
-acf(resid(m12))  # no autocorrelation
-vif(m12)  # Should be lower < 5 (for centered numerical variables): OK
-qqnorm(resid(m12)) 
-qqline(resid(m12)) # bit heavy tailed
-
-# Trimming
-df.nospr3 <- df.nospr[abs(scale(resid(m12))) < 2.5, ]  # 98.5% of original data
-summary(m12.2 <- lmer(time.lag.norm ~ cluster + duration.tt + akinetic + (1+cluster|subj), data=df.nospr3[df.nospr3$group == "PD",], control=lmerControl(optimizer="Nelder_Mead")))
-qqnorm(resid(m12)) 
-qqline(resid(m12)) # Doesn't improve
-
-plot(resid(m12), fitted(m12)) # Doesn't look OK
+summary(m8.PD <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster + duration.tt + gender + akinetic, data=df.nospr[df.nospr$group == "PD",], method = "ML"))
+compareML(m6.PD, m8.PD)
 ```
+No improvement.
+
