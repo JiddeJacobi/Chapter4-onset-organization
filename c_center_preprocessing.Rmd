@@ -147,11 +147,11 @@ sp.CC <- df %>%
   mutate(dur.C2.norm = (t5.p - t3.p)/(t5.p - t3.s))
 
 
-plot(sp.CC$time.lag.norm, sp.CC$dur.C2.norm)
-cor(sp.CC$time.lag.norm, sp.CC$dur.C2.norm, use = "complete.obs")
+cor(sp.CC$time.lag.norm, sp.CC$dur.C1.norm, use = "complete.obs")
+ggplot(sp.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sp/" )
 
-plot(sp.CC$time.lag.norm[sp.CC$group == "CTRL"], sp.CC$dur.C1.norm[sp.CC$group == "CTRL"])
-plot(sp.CC$time.lag.norm[sp.CC$group == "PD"], sp.CC$dur.C1.norm[sp.CC$group == "PD"])
+cor(sp.CC$time.lag.norm, sp.CC$dur.C2.norm, use = "complete.obs")
+ggplot(sp.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sp/")
 
 rm(offset.s)
 
@@ -190,12 +190,11 @@ sm.CC <- df %>%
   mutate(dur.C2.norm = (t5.m - t3.m)/(t5.m - t3.s))
 
 
-plot(sm.CC$time.lag.norm, sm.CC$dur.C2.norm)
+cor(sm.CC$time.lag.norm, sm.CC$dur.C1.norm, use = "complete.obs")
+ggplot(sm.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sm/")
+
 cor(sm.CC$time.lag.norm, sm.CC$dur.C2.norm, use = "complete.obs")
-
-plot(sm.CC$time.lag.norm[sm.CC$group == "CTRL"], sm.CC$dur.C1.norm[sm.CC$group == "CTRL"], use = "complete.obs")
-plot(sm.CC$time.lag.norm[sm.CC$group == "PD"], sm.CC$dur.C1.norm[sm.CC$group == "PD"], use = "complete.obs")
-
+ggplot(sm.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sm/")
 
 rm(offset.s)
 
@@ -234,11 +233,15 @@ sx.CC <- df %>%
   mutate(dur.C2.norm = (t5.x - t3.x)/(t5.x - t3.s))
 
 
-plot(sx.CC$time.lag.norm, sx.CC$dur.C2.norm)
-cor(sx.CC$time.lag.norm, sx.CC$dur.C2.norm, use = "complete.obs")
+cor(sx.CC$time.lag.norm, sx.CC$dur.C1.norm, use = "complete.obs")
+ggplot(sx.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sx/")
 
-plot(sx.CC$time.lag.norm[sx.CC$group == "CTRL"], sx.CC$dur.C1.norm[sx.CC$group == "CTRL"])
-plot(sx.CC$time.lag.norm[sx.CC$group == "PD"], sx.CC$dur.C1.norm[sx.CC$group == "PD"])
+cor(sx.CC$time.lag.norm, sx.CC$dur.C2.norm, use = "complete.obs")
+ggplot(sx.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sx/")
+
+
+
+
 
 # getting rid of NA's
 sx.CC <- na.omit(sx.CC, cols="time.lag.norm")
@@ -288,18 +291,15 @@ spr.CC <- df %>%
   mutate(dur.C3.norm = (t5.r - t3.r)/(t5.r - t3.s))
 
 
-plot(spr.CC$time.lag.norm, spr.CC$dur.C2.norm)
+
+cor(spr.CC$time.lag.norm, spr.CC$dur.C1.norm, use = "complete.obs")
+ggplot(spr.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /spr/")
+
 cor(spr.CC$time.lag.norm, spr.CC$dur.C2.norm, use = "complete.obs")  
+ggplot(spr.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /spr/")
 
-plot(spr.CC$time.lag.norm, spr.CC$dur.C3.norm)
 cor(spr.CC$time.lag.norm, spr.CC$dur.C3.norm, use = "complete.obs")
-
-cor(spr.CC$time.lag.norm[spr.CC$group == "CTRL"], spr.CC$dur.C1.norm[spr.CC$group == "CTRL"])
-cor(spr.CC$time.lag.norm[spr.CC$group == "PD"], spr.CC$dur.C1.norm[spr.CC$group == "PD"])
-
-plot(spr.CC$time.lag.norm[spr.CC$group == "CTRL"], spr.CC$dur.C1.norm[spr.CC$group == "CTRL"])
-plot(spr.CC$time.lag.norm[spr.CC$group == "PD"], spr.CC$dur.C1.norm[spr.CC$group == "PD"])
-
+ggplot(spr.CC, aes(x=time.lag.norm, y=dur.C3.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C3, /spr/")
 rm(offset.s)
 
 # getting rid of NA's
@@ -325,6 +325,54 @@ ggplot(df.CC.lag[df.CC.lag$cluster == "sp",], aes(x=condition, y=time.lag.norm, 
 ggplot(df.CC.lag[df.CC.lag$cluster == "sm",], aes(x=condition, y=time.lag.norm, fill=group)) + geom_violin() + labs(title = "CC lag /sm/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
 ggplot(df.CC.lag[df.CC.lag$cluster == "sx",], aes(x=condition, y=time.lag.norm, fill=group)) + geom_violin() + labs(title = "CC lag /sx/", y = "Lag between C's") + geom_boxplot(width=.2, position = dodge)
 ggplot(df.CC.lag[df.CC.lag$cluster == "spr",], aes(x=condition, y=time.lag.norm, fill=group)) + geom_violin() + labs(title = "CC lag /spr/", y = "Lag between /s/ and /r/") + geom_boxplot(width=.2, position = dodge)
+
+```
+# Examine duration of words
+```{r}
+start.word.complex <- df %>%
+  rowwise() %>%
+  filter(prompt == "opa schat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "s") %>%
+  select(subj, recording.no, t3, prompt) %>%
+  rename(start = t3)
+
+dur.word.complex <- df %>%
+  rowwise() %>%
+  filter(prompt == "opa schat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "t") %>%
+  select(subj, recording.no, t3, prompt) %>%
+  rename(finish = t3)  %>%
+  inner_join(start.word.complex, by=c("subj", "recording.no"))  %>%
+  mutate(dur.word = finish-start)
+
+start.word.simplex <- df %>%
+  rowwise() %>%
+  filter(prompt == "opa's gat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "X") %>%
+  select(subj, recording.no, t3, prompt) %>%
+  rename(start = t3)
+
+dur.word.simplex <- df %>%
+  rowwise() %>%
+  filter(prompt == "opa's gat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "t") %>%
+  select(subj, recording.no, t3, prompt) %>%
+  rename(finish = t3)  %>%
+  inner_join(start.word.simplex, by=c("subj", "recording.no"))  %>%
+  mutate(dur.word = finish-start)
+
+duration.word <- rbind(dur.word.simplex, dur.word.complex)
+
+boxplot(dur.word~prompt.y, data=duration.word)
+
 
 ```
 
