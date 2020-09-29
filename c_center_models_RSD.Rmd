@@ -1,0 +1,91 @@
+---
+title: "C-center models"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(lme4)
+library(car)
+library(visreg)
+library(optimx)
+library(lmerTest)
+library(emmeans)
+```
+
+
+
+## Read data
+```{r save data}
+df <- readRDS("../data/modelling_data_RSD.rds")
+```
+
+
+### Tweak data
+```{r}
+# Change order of levels in cluster
+df$cluster <- factor(df$cluster, levels = c("sp", "sm", "sx", "spr"))
+df <- subset(df, RSD != 0)
+```
+
+
+# LME models for RSD analysis
+
+## Hypothesis testing
+
+Fitting first model:
+```{r}
+summary(m <- lmer(RSD ~ (1|subj), data=df))
+```
+
+Adding condition as fixed effect:
+```{r}
+summary(m1 <- lmer(RSD ~ condition + (1|subj), data=df))
+anova(m,m1)
+```
+Sign. improvement.
+
+Adding cluster as fixed effect:
+```{r}
+summary(m2 <- lmer(RSD ~ condition*cluster + group + (1|subj), data=df))
+anova(m1,m2)
+```
+Post hoc comparisons:
+```{r}
+cols = RColorBrewer::brewer.pal(6,"Paired")
+emmeans(m2, specs = pairwise ~ condition|cluster, adjust = "tukey")
+
+
+emmip(m2, condition~cluster, CIs = TRUE) + labs(x = "Item pair", y = "Estimated marginal mean", color='Interval type') + scale_colour_manual(labels = c("C-center", "left edge", "right edge"), values = c("red", "darkgreen", "blue")) + theme_bw()
+```
+
+### Checking assumptions
+```{r}
+acf(resid(m2))  # no autocorrelation
+vif(m2)  # Should be lower < 5 (for centered numerical variables): OK
+qqnorm(resid(m2)) 
+qqline(resid(m2)) # heavy tailed
+
+summary(m2log <- lmer(log(RSD) ~ condition*cluster + group + (1|subj), data=df))
+
+qqnorm(resid(m2log)) 
+qqline(resid(m2log)) # better
+
+plot(resid(m2log), fitted(m2log)) # looks perfect
+emmeans(m2log, specs = pairwise ~ condition|cluster, adjust = "tukey")
+```
+
