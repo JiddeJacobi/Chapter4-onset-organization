@@ -32,7 +32,7 @@ library(itsadug)
 ```
 
 # Introduction
-From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C's is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we've included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable 'time.lag' is the time lag between the offset of the leftmost C and the onset of the rightmost C. If our hypothesis is correct the lag between the C's should be lower for the PD group in comparison with the controls.
+From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C's is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we've included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable 'time.lag.norm' is the normalized time lag between the offset of the leftmost C and the onset of the rightmost C. If our hypothesis is correct the lag between the C's should be lower for the PD group in comparison with the controls.
 
 
 ## Read data
@@ -85,7 +85,7 @@ If indeed patients would show a stronger preference for inphase coordination, th
 
 ## Hypothesis testing
 
-Fitting first model:
+Fitting first model, smooth over subject:
 ```{r}
 summary(m <- gam(time.lag.norm ~ s(subj, bs='re'), data=df.nospr, method = "ML"))
 ```
@@ -102,7 +102,7 @@ Adding group as fixed effect:
 summary(m2 <- gam(time.lag.norm ~ s(subj,bs='re') + cluster + group, data=df.nospr, method = "ML"))
 compareML(m1,m2)
 ```
-Doesn't improve.
+Doesn't improve enough (AIC diff < 2).
 
 Adding cluster:group as fixed effect:
 ```{r}
@@ -112,7 +112,7 @@ compareML(m1,m3)
 Sign. improvement.
 
 
-Add random slopes for cluster for each participant:
+Add smooth for cluster per subject.
 ```{r}
 summary(m3 <- gam(time.lag.norm ~ s(subj,bs='re') + cluster*group, data=df.nospr)) #fit m3 using REML
 
@@ -131,11 +131,12 @@ visreg(m4, "cluster", by = "group", overlay = T, points = list(cex = 0.1), ylab 
 ```
 
 ### Exploratory analysis
-Duration.
+
+Add speech rate.
 ```{r}
 m4 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group, data=df.nospr, method = "ML") #fit using ML
 
-df.nospr$duration.tt <- df.nospr$duration.tt - mean(df.nospr$duration.tt) #center variable
+df.nospr$duration.tt <- df.nospr$duration.tt - mean(df.nospr$duration.tt) # center continues variable
 
 summary(m5 <- gam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group + duration.tt, data=df.nospr, method = "ML"))
 compareML(m4, m5)

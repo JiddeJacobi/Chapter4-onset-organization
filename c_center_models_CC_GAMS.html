@@ -2853,7 +2853,7 @@ library(mgcv)</code></pre>
 </div>
 <div id="introduction" class="section level1">
 <h1><span class="header-section-number">2</span> Introduction</h1>
-<p>From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C’s is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we’ve included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable ‘time.lag’ is the time lag between the offset of the leftmost C and the onset of the rightmost C. If our hypothesis is correct the lag between the C’s should be lower for the PD group in comparison with the controls.</p>
+<p>From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C’s is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we’ve included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable ‘time.lag.norm’ is the normalized time lag between the offset of the leftmost C and the onset of the rightmost C. If our hypothesis is correct the lag between the C’s should be lower for the PD group in comparison with the controls.</p>
 <div id="read-data" class="section level2">
 <h2><span class="header-section-number">2.1</span> Read data</h2>
 <pre class="r"><code>df &lt;- readRDS(&quot;../data/modelling_data_CC.rds&quot;)</code></pre>
@@ -2899,7 +2899,7 @@ df$cluster &lt;- factor(df$cluster, levels = c(&quot;sp&quot;, &quot;sm&quot;, &
 <p>If indeed patients would show a stronger preference for inphase coordination, this would mean that they would produce the C gestures in the syllable’s onset closer together in time. For this, we look at the lag between the gestural offset of the leftmost C and the gestural onset of the righmost C in complex clusters.</p>
 <div id="hypothesis-testing" class="section level2">
 <h2><span class="header-section-number">3.1</span> Hypothesis testing</h2>
-<p>Fitting first model:</p>
+<p>Fitting first model, smooth over subject:</p>
 <pre class="r"><code>summary(m &lt;- gam(time.lag.norm ~ s(subj, bs=&#39;re&#39;), data=df.nospr, method = &quot;ML&quot;))</code></pre>
 <pre><code>## 
 ## Family: gaussian 
@@ -2999,7 +2999,7 @@ df$cluster &lt;- factor(df$cluster, levels = c(&quot;sp&quot;, &quot;sm&quot;, &
 ## 
 ## AIC difference: -0.12, model m1 has lower AIC.</code></pre>
 <pre><code>## Warning in compareML(m1, m2): Only small difference in ML...</code></pre>
-<p>Doesn’t improve.</p>
+<p>Doesn’t improve enough (AIC diff &lt; 2).</p>
 <p>Adding cluster:group as fixed effect:</p>
 <pre class="r"><code>summary(m3 &lt;- gam(time.lag.norm ~ s(subj,bs=&#39;re&#39;) + cluster*group, data=df.nospr, method = &quot;ML&quot;))</code></pre>
 <pre><code>## 
@@ -3041,7 +3041,7 @@ df$cluster &lt;- factor(df$cluster, levels = c(&quot;sp&quot;, &quot;sm&quot;, &
 ## 
 ## AIC difference: 58.64, model m3 has lower AIC.</code></pre>
 <p>Sign. improvement.</p>
-<p>Add random slopes for cluster for each participant:</p>
+<p>Add smooth for cluster per subject.</p>
 <pre class="r"><code>summary(m3 &lt;- gam(time.lag.norm ~ s(subj,bs=&#39;re&#39;) + cluster*group, data=df.nospr)) #fit m3 using REML</code></pre>
 <pre><code>## 
 ## Family: gaussian 
@@ -3116,10 +3116,10 @@ df$cluster &lt;- factor(df$cluster, levels = c(&quot;sp&quot;, &quot;sm&quot;, &
 </div>
 <div id="exploratory-analysis" class="section level3">
 <h3><span class="header-section-number">3.1.1</span> Exploratory analysis</h3>
-<p>Duration.</p>
+<p>Add speech rate.</p>
 <pre class="r"><code>m4 &lt;- gam(time.lag.norm ~ s(subj,bs=&#39;re&#39;) + s(subj, cluster, bs=&quot;re&quot;) + cluster*group, data=df.nospr, method = &quot;ML&quot;) #fit using ML
 
-df.nospr$duration.tt &lt;- df.nospr$duration.tt - mean(df.nospr$duration.tt) #center variable
+df.nospr$duration.tt &lt;- df.nospr$duration.tt - mean(df.nospr$duration.tt) # center continues variable
 
 summary(m5 &lt;- gam(time.lag.norm ~ s(subj,bs=&#39;re&#39;) + s(subj, cluster, bs=&quot;re&quot;) + cluster*group + duration.tt, data=df.nospr, method = &quot;ML&quot;))</code></pre>
 <pre><code>## 
