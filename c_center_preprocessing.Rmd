@@ -29,6 +29,7 @@ library("ez")
 ```{r read}
 df <- read.csv("../data/c-center_16th_Sep.csv", header = TRUE, sep = ",")
 load("../data/speech_rate.Rda")
+df_sr <- drop_na(df_sr)
 ```
 
 ## Merge mview output with speech rate dataframe
@@ -128,7 +129,7 @@ offset.s <- df %>%
   filter(seg == "s") %>%
   select(subj, recording.no, t3, t5) %>%
   rename(t3.s = t3) %>%
-  rename(t5.s = t5) 
+  rename(t5.s = t5)
 
 # collect onset times /p/ and merge df's
 sp.CC <- df %>%
@@ -147,11 +148,16 @@ sp.CC <- df %>%
   mutate(dur.C2.norm = (t5.p - t3.p)/(t5.p - t3.s))
 
 
-cor(sp.CC$time.lag.norm, sp.CC$dur.C1.norm, use = "complete.obs")
-ggplot(sp.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sp/" )
+sp.C1.plot <- ggplot(sp.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
+print(sp.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sp/", x = "Normalized IPI", y = "Normalized duration C1") + xlim(-1, 1) + ylim(0,1)) 
+cor.test(sp.CC$time.lag.norm, sp.CC$dur.C1.norm)
 
-cor(sp.CC$time.lag.norm, sp.CC$dur.C2.norm, use = "complete.obs")
-ggplot(sp.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sp/")
+sp.C2.plot <- ggplot(sp.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
+print(sp.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sp/", x = "Normalized IPI", y = "Normalized duration C2") + xlim(-1, 1) + ylim(0,1)) 
+cor.test(sp.CC$time.lag.norm, sp.CC$dur.C2.norm)
+
+
+rm(sp.C1.plot, sp.C2.plot)
 
 rm(offset.s)
 
@@ -190,12 +196,16 @@ sm.CC <- df %>%
   mutate(dur.C2.norm = (t5.m - t3.m)/(t5.m - t3.s))
 
 
-cor(sm.CC$time.lag.norm, sm.CC$dur.C1.norm, use = "complete.obs")
-ggplot(sm.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sm/")
+sm.C1.plot <- ggplot(sm.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
+print(sm.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sm/", x = "Normalized IPI", y = "Normalized duration C1") + xlim(-1, 1) + ylim(0,1))
+cor.test(sm.CC$time.lag.norm, sm.CC$dur.C1.norm)
 
-cor(sm.CC$time.lag.norm, sm.CC$dur.C2.norm, use = "complete.obs")
-ggplot(sm.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sm/")
+sm.C2.plot <- ggplot(sm.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
+print(sm.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sm/", x = "Normalized IPI", y = "Normalized duration C2") + xlim(-1, 1) + ylim(0,1))
+cor.test(sm.CC$time.lag.norm, sm.CC$dur.C2.norm)
 
+
+rm(sm.C1.plot, sm.C2.plot)
 rm(offset.s)
 
 # getting rid of NA's
@@ -207,7 +217,7 @@ ggplot(sm.CC, aes(x=subj, y=time.lag.norm, fill=group, na.rm = T)) + geom_boxplo
 
 /sx/ CC lag
 ```{r}
-# collect offset times /s/
+# collect on and offset times /s/
 offset.s <- df %>%
   rowwise() %>%
   filter(prompt == "opa schat") %>%
@@ -230,16 +240,25 @@ sx.CC <- df %>%
   mutate(time.lag = t3.x-t5.s) %>%
   mutate(time.lag.norm = time.lag/(t5.x - t3.s)) %>%
   mutate(dur.C1.norm = (t5.s - t3.s)/(t5.x - t3.s))  %>%
-  mutate(dur.C2.norm = (t5.x - t3.x)/(t5.x - t3.s))
+  mutate(dur.C2.norm = (t5.x - t3.x)/(t5.x - t3.s)) %>%
+  filter(t3.x > t3.s)
+ 
+# remove trials where NONS /X/ preceeds /s/
+ 
 
 
-cor(sx.CC$time.lag.norm, sx.CC$dur.C1.norm, use = "complete.obs")
-ggplot(sx.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sx/")
 
-cor(sx.CC$time.lag.norm, sx.CC$dur.C2.norm, use = "complete.obs")
-ggplot(sx.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sx/")
+sx.C1.plot <- ggplot(sx.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
+print(sx.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sx/", x = "Normalized IPI", y = "Normalized duration C1") + xlim(-1, 1) + ylim(0,1))
+cor.test(sx.CC$time.lag.norm, sx.CC$dur.C1.norm)
 
+sx.C2.plot <- ggplot(sx.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
+print(sx.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sx/", x = "Normalized IPI", y = "Normalized duration C2") + xlim(-1, 1) + ylim(0,1))
+cor.test(sx.CC$time.lag.norm, sx.CC$dur.C2.norm)
 
+rm(sx.C1.plot, sx.C2.plot)
+
+rm(offset.s)
 
 
 
@@ -292,15 +311,20 @@ spr.CC <- df %>%
 
 
 
-cor(spr.CC$time.lag.norm, spr.CC$dur.C1.norm, use = "complete.obs")
-ggplot(spr.CC, aes(x=time.lag.norm, y=dur.C1.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /spr/")
+spr.C1.plot <- ggplot(spr.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
+print(spr.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /spr/", x = "Normalized IPI", y = "Normalized duration C1") + xlim(-1, 1) + ylim(0,1))
+cor.test(spr.CC$time.lag.norm, spr.CC$dur.C1.norm)
 
-cor(spr.CC$time.lag.norm, spr.CC$dur.C2.norm, use = "complete.obs")  
-ggplot(spr.CC, aes(x=time.lag.norm, y=dur.C2.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /spr/")
+spr.C2.plot <- ggplot(spr.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
+print(spr.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /spr/", x = "Normalized IPI", y = "Normalized duration C2") + xlim(-1, 1) + ylim(0,1))
+cor.test(spr.CC$time.lag.norm, spr.CC$dur.C2.norm)
 
-cor(spr.CC$time.lag.norm, spr.CC$dur.C3.norm, use = "complete.obs")
-ggplot(spr.CC, aes(x=time.lag.norm, y=dur.C3.norm)) + geom_point(size = 1, shape= 1) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C3, /spr/")
-rm(offset.s)
+spr.C3.plot <- ggplot(spr.CC, aes(x = time.lag.norm, y = dur.C3.norm, color = group, shape = group)) + geom_point(size=2)
+print(spr.C3.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C3, /spr/", x = "Normalized IPI", y = "Normalized duration C3") + xlim(-1, 1) + ylim(0,1))
+rm(spr.C1.plot, spr.C2.plot, spr.C3.plot)
+cor.test(spr.CC$time.lag.norm, spr.CC$dur.C3.norm)
+
+rm(offset.s, offset.p)
 
 # getting rid of NA's
 spr.CC <- na.omit(spr.CC, cols="time.lag.norm")
@@ -373,6 +397,7 @@ duration.word <- rbind(dur.word.simplex, dur.word.complex)
 
 boxplot(dur.word~prompt.y, data=duration.word)
 
+rm(start.word.complex, start.word.simplex, dur.word.simplex, dur.word.complex, duration.word)
 
 ```
 
@@ -381,9 +406,9 @@ boxplot(dur.word~prompt.y, data=duration.word)
 ```{r}
 df <- df %>%
     rowwise() %>%
-    mutate(dur=t5 - t3) %>%
-    group_by(subj, cluster,  seg) %>%
-    mutate(norm.dur = scale(dur))
+    mutate(dur=t5 - t3) #%>%
+    #group_by(cluster, seg) %>%
+    #mutate(norm.dur = scale(dur))
 
 
 mean.dur.C <- df %>%
@@ -392,8 +417,20 @@ mean.dur.C <- df %>%
   filter(seg == "p"| seg == "m" | seg == "X") %>%
   group_by(seg) %>%
   select(cluster, condition, subj, seg, dur) %>%
-  mutate(mean.dur.C = mean(dur, na.rm=T)) %>%
-  distinct(subj, seg, mean.dur.C)
+  mutate(mean.dur.C = mean(dur, na.rm=T), sd.dur.C = sd(dur, na.rm=T)) %>%
+  distinct(subj, seg, mean.dur.C, sd.dur.C)  
+
+
+df %>%
+  group_by(cluster, condition, subj) %>%
+  filter(condition == "C" | condition == "CC") %>%
+  filter(seg == "p"| seg == "m" | seg == "X") %>%
+  group_by(seg) %>%
+  select(cluster, condition, subj, seg, dur) %>%
+  group_by(cluster, condition) %>%
+  summarize(mean.dur.C = mean(dur, na.rm=T), sd.dur.C = sd(dur, na.rm=T))
+
+
 
 diff <- df %>%
   group_by(cluster, condition, subj) %>%
@@ -410,20 +447,22 @@ diff %>%
   group_by(seg) %>%
   summarize(mean = mean(diff, na.rm=T), sd = sd(diff, na.rm=T))
 
-
+rm(mean.dur.C, diff)
 ```
 
 Plot durations of right C per group:
 ```{r}
 require(gridExtra)
 
-plot1 <-  ggplot(df[df$cluster == 'sp' & df$seg == "p",], aes(x=group, y=norm.dur, fill=condition)) + labs(title = "Duration /p/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
+dodge <- position_dodge(width = 0.9)
 
-plot2 <- ggplot(df[df$cluster == 'sm' & df$seg == "m",], aes(x=group, y=norm.dur, fill=condition)) + labs(title = "Duration /m/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
+plot1 <-  ggplot(df[df$cluster == 'sp' & df$seg == "p",], aes(x=group, y=dur, fill=condition)) + labs(title = "Duration /p/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
 
-plot3 <-  ggplot(df[df$cluster == 'sx' & df$seg == "X",], aes(x=group, y=norm.dur, fill=condition))  + labs(title = "Duration /x/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
+plot2 <- ggplot(df[df$cluster == 'sm' & df$seg == "m",], aes(x=group, y=dur, fill=condition)) + labs(title = "Duration /m/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
 
-plot4 <-  ggplot(df[df$cluster == 'spr' & df$seg == "r",], aes(x=group, y=norm.dur, fill=condition)) + labs(title = "Duration /r/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
+plot3 <-  ggplot(df[df$cluster == 'sx' & df$seg == "X",], aes(x=group, y=dur, fill=condition))  + labs(title = "Duration /x/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
+
+plot4 <-  ggplot(df[df$cluster == 'spr' & df$seg == "r",], aes(x=group, y=dur, fill=condition)) + labs(title = "Duration /r/", y = "Duration (ms)", x = "Group") + geom_boxplot(width=.2, position = dodge)
 
 grid.arrange(plot1, plot2, plot3, plot4, ncol=2)
 rm(plot1, plot2, plot3, plot4)
@@ -537,12 +576,60 @@ df.density <- df %>%
   
     ggplot(df.density[df.density$condition == 'CC' & df.density$seg == "X",], aes(x=time.to.mid, fill = side)) +
   geom_density(alpha=0.4) +  ggtitle("Distribution time to midpoint /x/ in CC")
+    
+rm(df.density)
 ```
 
 # Preparing data for C-center analysis based on nucleus on and offset
 
 
 ## Calculate lag's for /sp/ 
+
+Derive temporal midpoint of IPI
+```{r}
+# derive IPI simplex condition
+sp.IPI.simplex <- df %>%
+  filter(prompt == "oma's pad") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "p") %>%
+  rename(IPI = mid.nuc) %>%
+  select(subj, prompt, recording.no, IPI) %>%
+  select(subj, recording.no, IPI) 
+
+# derive offset onset /s/ 
+offset.s <- df %>%
+  filter(prompt == "oma spat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "s") %>%
+  rename(OFFS.s = t5) %>%
+  select(subj, prompt, recording.no, OFFS.s)
+  
+# derive time of onset /p/ 
+onset.p <- df %>%
+  filter(prompt == "oma spat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "p") %>%
+  rename(ONS.p = t3) %>%
+  select(subj, prompt, recording.no,  ONS.p)
+
+
+# calculate IPI
+sp.IPI.complex <- offset.s %>%
+  left_join(onset.p, by=c("subj", "prompt", "recording.no")) %>%
+  rowwise() %>%
+  mutate(IPI= OFFS.s + ((ONS.p - OFFS.s)/2)) %>%
+  select(subj, recording.no, IPI) %>%
+  drop_na()    
+
+sp.IPI <- rbind(sp.IPI.simplex, sp.IPI.complex)
+
+rm(sp.IPI.simplex, sp.IPI.complex, offset.s, onset.p)
+```
+
+
 ```{r sp C-center}
 # derive time of nucleus midpoint onset /p/ 
 mid.nuc.p <- df %>%
@@ -551,7 +638,8 @@ mid.nuc.p <- df %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
   rename(mid.nuc.p = mid.nuc) %>%
-  select(subj, prompt, recording.no, mid.nuc.p)
+  select(subj, prompt, recording.no, mid.nuc.p) %>%
+  drop_na()   
   
 # derive time of nucleus midpoint onset /s/ 
 mid.nuc.s <- df %>%
@@ -560,7 +648,8 @@ mid.nuc.s <- df %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(mid.nuc.s = mid.nuc) %>%
-  select(subj, prompt, recording.no,  mid.nuc.s) 
+  select(subj, prompt, recording.no,  mid.nuc.s) %>%
+  drop_na()    
 
 # calculate C-center
 sp.c.center <- mid.nuc.p %>%
@@ -568,7 +657,8 @@ sp.c.center <- mid.nuc.p %>%
   left_join(mid.nuc.s, by=c("subj", "prompt", "recording.no")) %>%
   rowwise() %>%
   mutate(c.center = case_when(prompt == "oma's pad" ~ mid.nuc.p, prompt == "oma spat" ~ mean(c(mid.nuc.s, mid.nuc.p)))) %>%
-  select(subj, recording.no, c.center) 
+  select(subj, recording.no, c.center) %>%
+  drop_na()    
 
 rm(mid.nuc.p, mid.nuc.s)
 ```
@@ -582,7 +672,8 @@ sp.rightedge <- df %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
   rename(rightedge = t5) %>%
-  select(subj, recording.no, rightedge) 
+  select(subj, recording.no, rightedge) %>%
+  drop_na()    
 ```
 
 
@@ -595,7 +686,8 @@ Get leftedge /sp/
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()    
 ```
 
 Get leftedge /p/ 
@@ -607,12 +699,14 @@ sp.leftedge.C <- df %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()    
 ```
 
 Merge 
 ```{r}
 sp.leftedge <- rbind(sp.leftedge.CC, sp.leftedge.C)
+rm(sp.leftedge.CC, sp.leftedge.C)
 ```
 
 Get anchor /t/ 
@@ -624,7 +718,8 @@ sp.anchor <- df %>%
   group_by(recording.no) %>%
   filter(seg == "t") %>%
   rename(anchor = t3) %>%
-  select(subj, recording.no, anchor) 
+  select(subj, recording.no, anchor) %>%
+  drop_na()    
 ```
 
 Merge and remove obsolete df's
@@ -634,22 +729,68 @@ df.C.center.sp <- df %>%
   left_join(sp.c.center, by =c("subj", "recording.no")) %>%
   left_join(sp.rightedge, by =c("subj", "recording.no")) %>%
   left_join(sp.leftedge, by =c("subj", "recording.no")) %>%
+  left_join(sp.IPI, by =c("subj", "recording.no")) %>%
   left_join(sp.anchor, by =c("subj", "recording.no"))
 
-rm(sp.c.center, sp.rightedge, sp.anchor)
+rm(sp.c.center, sp.rightedge, sp.leftedge, sp.anchor, sp.IPI)
 ```
 
 
 ## Calculate lag's for /sm/ 
+
+Derive temporal midpoint of IPI
+```{r}
+# derive IPI simplex condition
+sm.IPI.simplex <- df %>%
+  filter(prompt == "opa's mat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "m") %>%
+  rename(IPI = mid.nuc) %>%
+  select(subj, prompt, recording.no, IPI) %>%
+  select(subj, recording.no, IPI) 
+
+# derive offset onset /s/ 
+offset.s <- df %>%
+  filter(prompt == "opa Smat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "s") %>%
+  rename(OFFS.s = t5) %>%
+  select(subj, prompt, recording.no, OFFS.s)
+  
+# derive time of onset /m/ 
+onset.m <- df %>%
+  filter(prompt == "opa Smat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "m") %>%
+  rename(ONS.m = t3) %>%
+  select(subj, prompt, recording.no,  ONS.m)
+
+
+# calculate IPI
+sm.IPI.complex <- offset.s %>%
+  left_join(onset.m, by=c("subj", "prompt", "recording.no")) %>%
+  rowwise() %>%
+  mutate(IPI= OFFS.s + ((ONS.m - OFFS.s)/2)) %>%
+  select(subj, recording.no, IPI) %>%
+  drop_na()  
+
+sm.IPI <- rbind(sm.IPI.simplex, sm.IPI.complex)
+
+rm(sm.IPI.simplex, sm.IPI.complex, offset.s, onset.m)
+```
+
 ```{r sm C-center}
 # collect mid.nuc time onset /m/ 
 mid.nuc.m <- df %>%
   filter(prompt == "opa Smat" | prompt == "opa's mat" ) %>%
-  group_by(subj) %>%
-  group_by(recording.no) %>%
+  group_by(subj, recording.no) %>%
   filter(seg == "m") %>%
   rename(mid.nuc.m = mid.nuc) %>%
-  select(subj, prompt, recording.no, mid.nuc.m)
+  select(subj, prompt, recording.no, mid.nuc.m) %>%
+  drop_na()  
 
 # collect mid.nuc time onset /s/
 mid.nuc.s <- df %>%
@@ -658,7 +799,8 @@ mid.nuc.s <- df %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(mid.nuc.s = mid.nuc) %>%
-  select(subj, prompt, recording.no,  mid.nuc.s) 
+  select(subj, prompt, recording.no,  mid.nuc.s)  %>%
+  drop_na()  
 
 # calculate C-center
 sm.c.center <- mid.nuc.m %>%
@@ -666,7 +808,8 @@ sm.c.center <- mid.nuc.m %>%
   left_join(mid.nuc.s, by=c("subj", "prompt", "recording.no")) %>%
   rowwise() %>%
   mutate(c.center = case_when(prompt == "opa's mat" ~ mid.nuc.m, prompt == "opa Smat" ~ mean(c(mid.nuc.s, mid.nuc.m)))) %>%
-  select(subj, recording.no, c.center) 
+  select(subj, recording.no, c.center) %>%
+  drop_na()  
 
 rm(mid.nuc.m, mid.nuc.s)
 ```
@@ -680,7 +823,8 @@ sm.rightedge <- df %>%
   group_by(recording.no) %>%
   filter(seg == "m") %>%
   rename(rightedge = t5) %>%
-  select(subj, recording.no, rightedge) 
+  select(subj, recording.no, rightedge) %>%
+  drop_na()  
 ```
 
 Get leftedge /sm/  
@@ -692,7 +836,8 @@ Get leftedge /sm/
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()  
 ```
 
 Get leftedge /m/ 
@@ -704,12 +849,14 @@ sm.leftedge.C <- df %>%
   group_by(recording.no) %>%
   filter(seg == "m") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()  
 ```
 
 Merge 
 ```{r}
 sm.leftedge <- rbind(sm.leftedge.CC, sm.leftedge.C)
+rm(sm.leftedge.CC, sm.leftedge.C)
 ```
 
 Get anchor /t/ 
@@ -721,23 +868,69 @@ sm.anchor <- df %>%
   group_by(recording.no) %>%
   filter(seg == "t") %>%
   rename(anchor = t3) %>%
-  select(subj, recording.no, anchor) 
+  select(subj, recording.no, anchor) %>%
+  drop_na() 
 ```
 
 Merge and remove obsolete df's
 ```{r}
 df.C.center.sm <- df %>%
   filter(prompt == "opa Smat" | prompt == "opa's mat" ) %>%
-  left_join(sm.c.center, by =c("subj", "recording.no")) %>%
+  inner_join(sm.c.center, by =c("subj", "recording.no")) %>%
   left_join(sm.rightedge, by =c("subj", "recording.no")) %>%
   left_join(sm.leftedge, by =c("subj", "recording.no")) %>%
+  left_join(sm.IPI, by =c("subj", "recording.no")) %>%
   left_join(sm.anchor, by =c("subj", "recording.no"))
 
-rm(sm.c.center, sm.rightedge, sm.anchor)
+rm(sm.c.center, sm.rightedge, sm.leftedge, sm.anchor, sm.IPI)
 ```
 
 
 ## Calculate lag's for /sx/ 
+
+Derive temporal midpoint of IPI
+```{r}
+# derive IPI simplex condition
+sx.IPI.simplex <- df %>%
+  filter(prompt == "opa's gat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "X") %>%
+  rename(IPI = mid.nuc) %>%
+  select(subj, prompt, recording.no, IPI) %>%
+  select(subj, recording.no, IPI) 
+
+# derive offset onset /s/ 
+offset.s <- df %>%
+  filter(prompt == "opa schat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "s") %>%
+  rename(OFFS.s = t5) %>%
+  select(subj, prompt, recording.no, OFFS.s)
+  
+# derive time of  /x/ 
+onset.x <- df %>%
+  filter(prompt == "opa schat") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "X") %>%
+  rename(ONS.x = t3) %>%
+  select(subj, prompt, recording.no,  ONS.x)
+
+
+# calculate IPI
+sx.IPI.complex <- offset.s %>%
+  left_join(onset.x, by=c("subj", "prompt", "recording.no")) %>%
+  rowwise() %>%
+  mutate(IPI= OFFS.s + ((ONS.x - OFFS.s)/2)) %>%
+  select(subj, recording.no, IPI) 
+
+sx.IPI <- rbind(sx.IPI.simplex, sx.IPI.complex)
+
+rm(sx.IPI.simplex, sx.IPI.complex, offset.s, onset.x)
+```
+
 ```{r sx C-center}
 # collect mid.nuc time onset /x/ 
 mid.nuc.x <- df %>%
@@ -746,7 +939,8 @@ mid.nuc.x <- df %>%
   group_by(recording.no) %>%
   filter(seg == "X") %>%
   rename(mid.nuc.x = mid.nuc) %>%
-  select(subj, prompt, recording.no, mid.nuc.x)
+  select(subj, prompt, recording.no, mid.nuc.x) %>%
+  drop_na()   
   
 # collect mid.nuc time onset /s/
 mid.nuc.s <- df %>%
@@ -755,7 +949,8 @@ mid.nuc.s <- df %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(mid.nuc.s = mid.nuc) %>%
-  select(subj, prompt, recording.no,  mid.nuc.s) 
+  select(subj, prompt, recording.no,  mid.nuc.s) %>%
+  drop_na()    
 
 # calculate C-center
 sx.c.center <- mid.nuc.x %>%
@@ -763,7 +958,8 @@ sx.c.center <- mid.nuc.x %>%
   left_join(mid.nuc.s, by=c("subj", "prompt", "recording.no")) %>%
   rowwise() %>%
   mutate(c.center = case_when(prompt == "opa's gat" ~ mid.nuc.x, prompt == "opa schat" ~ mean(c(mid.nuc.s, mid.nuc.x)))) %>%
-  select(subj, recording.no, c.center) 
+  select(subj, recording.no, c.center) %>%
+  drop_na()    
 
 rm(mid.nuc.x, mid.nuc.s)
 ```
@@ -777,7 +973,8 @@ sx.rightedge <- df %>%
   group_by(recording.no) %>%
   filter(seg == "X") %>%
   rename(rightedge = t5) %>%
-  select(subj, recording.no, rightedge) 
+  select(subj, recording.no, rightedge) %>%
+  drop_na()   
 ```
 
 
@@ -790,7 +987,8 @@ Get leftedge /sx/
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()   
 ```
 
 Get leftedge /x/ 
@@ -802,12 +1000,14 @@ sx.leftedge.C <- df %>%
   group_by(recording.no) %>%
   filter(seg == "X") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()   
 ```
 
 Merge 
 ```{r}
 sx.leftedge <- rbind(sx.leftedge.CC, sx.leftedge.C)
+rm(sx.leftedge.CC, sx.leftedge.C)
 ```
 
 Get anchor /t/ 
@@ -819,7 +1019,8 @@ sx.anchor <- df %>%
   group_by(recording.no) %>%
   filter(seg == "t") %>%
   rename(anchor = t3) %>%
-  select(subj, recording.no, anchor) 
+  select(subj, recording.no, anchor) %>%
+  drop_na()    
 ```
 
 Merge and remove obsolete df's
@@ -829,13 +1030,62 @@ df.C.center.sx <- df %>%
   left_join(sx.c.center, by =c("subj", "recording.no")) %>%
   left_join(sx.rightedge, by =c("subj", "recording.no")) %>%
   left_join(sx.leftedge, by =c("subj", "recording.no")) %>%
+  left_join(sx.IPI, by =c("subj", "recording.no")) %>%
   left_join(sx.anchor, by =c("subj", "recording.no"))
 
-rm(sx.c.center, sx.rightedge, sx.anchor)
+rm(sx.c.center, sx.rightedge, sx.leftedge,  sx.anchor, sx.IPI)
 ```
 
 
 ## Calculate lag's for /spr/ 
+
+Derive temporal midpoint of IPI
+```{r}
+# derive IPI simplex condition
+spr.IPI.simplex <- df %>%
+  filter(prompt == "oma's prak") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "s") %>%
+  rename(IPI = mid.nuc) %>%
+  select(subj, prompt, recording.no, IPI) %>%
+  select(subj, recording.no, IPI) %>%
+  drop_na()    
+
+# derive offset onset /s/ 
+offset.s <- df %>%
+  filter(prompt == "oma sprak") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "s") %>%
+  rename(OFFS.s = t5) %>%
+  select(subj, prompt, recording.no, OFFS.s) %>%
+  drop_na()   
+  
+# derive onset time of  /r/ 
+onset.r <- df %>%
+  filter(prompt == "oma sprak") %>%
+  group_by(subj) %>%
+  group_by(recording.no) %>%
+  filter(seg == "r") %>%
+  rename(ONS.r = t3) %>%
+  select(subj, prompt, recording.no,  ONS.r) %>%
+  drop_na()   
+
+
+# calculate IPI
+spr.IPI.complex <- offset.s %>%
+  left_join(onset.r, by=c("subj", "prompt", "recording.no")) %>%
+  rowwise() %>%
+  mutate(IPI= OFFS.s + ((ONS.r - OFFS.s)/2)) %>%
+  select(subj, recording.no, IPI) %>%
+  drop_na()   
+
+spr.IPI <- rbind(spr.IPI.simplex, spr.IPI.complex)
+
+rm(spr.IPI.simplex, spr.IPI.complex, offset.s, onset.r)
+```
+
 ```{r spr C-center}
 # collect mid.nuc time onset /r/ 
 mid.nuc.r <- df %>%
@@ -844,7 +1094,8 @@ mid.nuc.r <- df %>%
   group_by(recording.no) %>%
   filter(seg == "r") %>%
   rename(mid.nuc.r = mid.nuc) %>%
-  select(subj, prompt, recording.no, mid.nuc.r)
+  select(subj, prompt, recording.no, mid.nuc.r) %>%
+  drop_na()   
   
 # collect mid.nuc time onset /p/
 mid.nuc.p <- df %>%
@@ -853,7 +1104,8 @@ mid.nuc.p <- df %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
   rename(mid.nuc.p = mid.nuc) %>%
-  select(subj, prompt, recording.no,  mid.nuc.p) 
+  select(subj, prompt, recording.no,  mid.nuc.p) %>%
+  drop_na()    
 
 # collect mid.nuc time onset /s/
 mid.nuc.s <- df %>%
@@ -862,7 +1114,8 @@ mid.nuc.s <- df %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(mid.nuc.s = mid.nuc) %>%
-  select(subj, prompt, recording.no,  mid.nuc.s) 
+  select(subj, prompt, recording.no,  mid.nuc.s) %>%
+  drop_na()   
 
 # calculate C-center
 spr.c.center <- mid.nuc.r %>%
@@ -871,7 +1124,8 @@ spr.c.center <- mid.nuc.r %>%
   left_join(mid.nuc.p, by=c("subj", "prompt", "recording.no")) %>%
   rowwise() %>%
   mutate(c.center = case_when(prompt == "oma's prak" ~ mid.nuc.r, prompt == "oma sprak" ~ mean(c(mid.nuc.s, mid.nuc.p, mid.nuc.r)))) %>%
-  select(subj, recording.no, c.center) 
+  select(subj, recording.no, c.center) %>%
+  drop_na()  
 
 rm(mid.nuc.r, mid.nuc.s, mid.nuc.p)
 ```
@@ -885,7 +1139,8 @@ spr.rightedge <- df %>%
   group_by(recording.no) %>%
   filter(seg == "r") %>%
   rename(rightedge = t5) %>%
-  select(subj, recording.no, rightedge) 
+  select(subj, recording.no, rightedge) %>%
+  drop_na()   
 ```
 
 Get leftedge /spr/  
@@ -897,7 +1152,8 @@ spr.leftedge.CCC <- df %>%
   group_by(recording.no) %>%
   filter(seg == "s") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()   
 ```
 
 Get leftedge /pr/ 
@@ -909,12 +1165,14 @@ spr.leftedge.CC <- df %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
   rename(leftedge = t3) %>%
-  select(subj, recording.no, leftedge) 
+  select(subj, recording.no, leftedge) %>%
+  drop_na()   
 ```
 
 Merge 
 ```{r}
 spr.leftedge <- rbind(spr.leftedge.CCC, spr.leftedge.CC)
+rm(spr.leftedge.CCC, spr.leftedge.CC)
 ```
 
 Get anchor /k/ 
@@ -926,7 +1184,8 @@ spr.anchor <- df %>%
   group_by(recording.no) %>%
   filter(seg == "k") %>%
   rename(anchor = t3) %>%
-  select(subj, recording.no, anchor) 
+  select(subj, recording.no, anchor) %>%
+  drop_na()   
 ```
 
 Merge and remove obsolete df's
@@ -936,9 +1195,10 @@ df.C.center.spr <- df %>%
   left_join(spr.c.center, by =c("subj", "recording.no")) %>%
   left_join(spr.rightedge, by =c("subj", "recording.no")) %>%
   left_join(spr.leftedge, by =c("subj", "recording.no")) %>%
+  left_join(spr.IPI, by =c("subj", "recording.no")) %>%
   left_join(spr.anchor, by =c("subj", "recording.no"))
 
-rm(spr.c.center, spr.rightedge, spr.anchor)
+#rm(spr.c.center, spr.rightedge, spr.leftedge, spr.anchor, spr.IPI)
 ```
 
 
@@ -950,8 +1210,9 @@ rm(df.C.center.sp, df.C.center.sm, df.C.center.sx, df.C.center.spr)
 df.C.center <- df.C.center  %>%
     rowwise() %>%
     mutate(c.center.lag = anchor - c.center) %>%
-    mutate(rightedge.lag = anchor - rightedge)%>%
-    mutate(leftedge.lag = anchor - leftedge) 
+    mutate(rightedge.lag = anchor - rightedge) %>%
+    mutate(leftedge.lag = anchor - leftedge) %>%
+    mutate(IPI.lag = anchor - IPI) 
 ```
 
 ## Distribution
@@ -971,6 +1232,9 @@ ggplot(df.C.center[df.C.center$cluster == 'sm',], aes(x=group, y=c.center.lag, f
 ggplot(df.C.center[df.C.center$cluster == 'sm',], aes(x=group, y=rightedge.lag, fill=condition)) + geom_violin() + labs(title = "/sm/, rightedge", y = "Lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sm',], aes(x=group, y=leftedge.lag, fill=condition)) + geom_violin() + labs(title = "/sm/, leftedge", y = "Lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
+
+
+ggplot(df.C.center[df.C.center$cluster == 'sm',], aes(x=group, y=IPI.lag, fill=condition)) + geom_violin() + labs(title = "/sm/, IPI", y = "Lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
 ```
 
 /sp/
@@ -980,6 +1244,9 @@ ggplot(df.C.center[df.C.center$cluster == 'sp',], aes(x=group, y=c.center.lag, f
 ggplot(df.C.center[df.C.center$cluster == 'sp',], aes(x=group, y=rightedge.lag, fill=condition)) + geom_violin() + labs(title = "/sp/, rightedge", y = "lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sp',], aes(x=group, y=leftedge.lag, fill=condition)) + geom_violin() + labs(title = "/sp/, leftedge", y = "lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
+
+
+ggplot(df.C.center[df.C.center$cluster == 'sp',], aes(x=group, y=IPI.lag, fill=condition)) + geom_violin() + labs(title = "/sp/, IPI", y = "lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
 ```
 
 /sx/
@@ -989,6 +1256,8 @@ ggplot(df.C.center[df.C.center$cluster == 'sx',], aes(x=group, y=c.center.lag, f
 ggplot(df.C.center[df.C.center$cluster == 'sx',], aes(x=group, y=rightedge.lag, fill=condition)) + geom_violin() + labs(title = "/sx/, rightedge", y = "lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sx',], aes(x=group, y=leftedge.lag, fill=condition)) + geom_violin() + labs(title = "/sx/, leftedge", y = "lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
+
+ggplot(df.C.center[df.C.center$cluster == 'sx',], aes(x=group, y=IPI.lag, fill=condition)) + geom_violin() + labs(title = "/sx/, IPI", y = "lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
 ```
 
 /spr/
@@ -1016,7 +1285,6 @@ ggplot(df.C.center[df.C.center$cluster == 'sm' & df.C.center$group == 'PD',], ae
 
 /sp/
 ```{r}
-
 ggplot(df.C.center[df.C.center$cluster == 'sp' & df.C.center$group == 'CTRL',], aes(x=subj, y=c.center.lag, fill=condition)) +  labs(title = "/sp/, c-center, CTRL", y = "lag") + geom_boxplot(width=.5 )+ ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sp' & df.C.center$group == 'CTRL',], aes(x=subj, y=rightedge.lag, fill=condition)) +  labs(title = "/sp/, rightedge, CTRL", y = "lag") + geom_boxplot(width=.5) + ylim(80, 350)
@@ -1028,7 +1296,6 @@ ggplot(df.C.center[df.C.center$cluster == 'sp' & df.C.center$group == 'PD',], ae
 
 /sx/
 ```{r}
-
 ggplot(df.C.center[df.C.center$cluster == 'sx' & df.C.center$group == 'CTRL',], aes(x=subj, y=c.center.lag, fill=condition)) +  labs(title = "/sx/, c-center, CTRL", y = "lag") + geom_boxplot(width=.5 )+ ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sx' & df.C.center$group == 'CTRL',], aes(x=subj, y=rightedge.lag, fill=condition)) +  labs(title = "/sx/, rightedge, CTRL", y = "lag") + geom_boxplot(width=.5) + ylim(80, 350)
@@ -1040,7 +1307,6 @@ ggplot(df.C.center[df.C.center$cluster == 'sx' & df.C.center$group == 'PD',], ae
 
 /spr/
 ```{r}
-
 ggplot(df.C.center[df.C.center$cluster == 'spr' & df.C.center$group == 'CTRL',], aes(x=subj, y=c.center.lag, fill=condition)) +  labs(title = "/spr/, c-center, CTRL", y = "lag") + geom_boxplot(width=.5 )+ ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'spr' & df.C.center$group == 'CTRL',], aes(x=subj, y=rightedge.lag, fill=condition)) +  labs(title = "/spr/, rightedge, CTRL", y = "lag") + geom_boxplot(width=.5) + ylim(80, 350)
@@ -1056,7 +1322,6 @@ ggplot(df.C.center[df.C.center$cluster == 'spr' & df.C.center$group == 'PD',], a
 
 /sm/
 ```{r}
-
 ggplot(df.C.center[df.C.center$cluster == 'sm',], aes(x=group, y=c.center.lag, fill=condition)) + geom_violin() + labs(title = "/sm/, c-center", y = "Lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sm',], aes(x=group, y=rightedge.lag, fill=condition)) + geom_violin() + labs(title = "/sm/, rightedge", y = "Lag") + geom_boxplot(width=.2, position = dodge) + ylim(80, 350)
@@ -1107,7 +1372,6 @@ ggplot(df.C.center[df.C.center$cluster == 'sm' & df.C.center$group == 'PD',], ae
 
 /sp/
 ```{r}
-
 ggplot(df.C.center[df.C.center$cluster == 'sp' & df.C.center$group == 'CTRL',], aes(x=subj, y=c.center.lag, fill=condition)) +  labs(title = "/sp/, c-center, CTRL", y = "lag") + geom_boxplot(width=.5 )+ ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sp' & df.C.center$group == 'CTRL',], aes(x=subj, y=rightedge.lag, fill=condition)) +  labs(title = "/sp/, rightedge, CTRL", y = "lag") + geom_boxplot(width=.5) + ylim(80, 350)
@@ -1119,7 +1383,6 @@ ggplot(df.C.center[df.C.center$cluster == 'sp' & df.C.center$group == 'PD',], ae
 
 /sx/
 ```{r}
-
 ggplot(df.C.center[df.C.center$cluster == 'sx' & df.C.center$group == 'CTRL',], aes(x=subj, y=c.center.lag, fill=condition)) +  labs(title = "/sx/, c-center, CTRL", y = "lag") + geom_boxplot(width=.5 )+ ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'sx' & df.C.center$group == 'CTRL',], aes(x=subj, y=rightedge.lag, fill=condition)) +  labs(title = "/sx/, rightedge, CTRL", y = "lag") + geom_boxplot(width=.5) + ylim(80, 350)
@@ -1131,7 +1394,6 @@ ggplot(df.C.center[df.C.center$cluster == 'sx' & df.C.center$group == 'PD',], ae
 
 /spr/
 ```{r}
-
 ggplot(df.C.center[df.C.center$cluster == 'spr' & df.C.center$group == 'CTRL',], aes(x=subj, y=c.center.lag, fill=condition)) +  labs(title = "/spr/, c-center, CTRL", y = "lag") + geom_boxplot(width=.5 )+ ylim(80, 350)
 
 ggplot(df.C.center[df.C.center$cluster == 'spr' & df.C.center$group == 'CTRL',], aes(x=subj, y=rightedge.lag, fill=condition)) +  labs(title = "/spr/, rightedge, CTRL", y = "lag") + geom_boxplot(width=.5) + ylim(80, 350)
@@ -1169,21 +1431,24 @@ ggplot(df.RSD, aes(x=subj, y=RSD.C.center, fill = group)) + geom_boxplot()
 df.RSD.long <- df.RSD %>%
   group_by(subj, group, cluster) %>%
   gather(condition,RSD,c(RSD.leftedge, RSD.rightedge, RSD.C.center)) %>%
-  select(subj, group, cluster, condition, RSD) %>%
-  arrange(subj, group, cluster, condition, RSD)
+  select(subj, group, cluster, condition, RSD, duration.tt, recording.no) %>%
+  arrange(subj, group, recording.no, cluster, condition,  RSD)
 
+df.RSD.long$subj <- as.factor(df.RSD.long$subj)
 df.RSD.long$subj <- droplevels(df.RSD.long$subj)
+
+df.RSD.long$condition[df.RSD.long$condition == "RSD.leftedge"] <- "left edge"
+df.RSD.long$condition[df.RSD.long$condition == "RSD.rightedge"] <- "right edge"
+df.RSD.long$condition[df.RSD.long$condition == "RSD.C.center"] <- "C-center"
 df.RSD.long$condition <- as.factor(df.RSD.long$condition)
 
 #ezANOVA(RSD.long, dv=value, wid=subj, within=condition, between=group)
 
 # display group means
 df.RSD %>%
-  group_by(group, cluster) %>%
+  group_by(cluster, group) %>%
   summarize(mean.leftedge = mean(RSD.leftedge), sd.leftedge = sd(RSD.leftedge), mean.rightedge = mean(RSD.rightedge), sd.rightedge = sd(RSD.rightedge), mean.C.center = mean(RSD.C.center), sd.C.center = sd(RSD.C.center)) %>%
 gather(condition,value,c(mean.leftedge, mean.rightedge, mean.C.center))
-
-
 ```
 
 
@@ -1195,15 +1460,19 @@ setwd("/Users/45598770/Documents/analysis/data")
 df_meta <- read.csv("metadata.csv", header = TRUE, sep = ",")
 df_meta$gender <- as.factor(df_meta$gender)
 df.CC.lag <-  merge(df.CC.lag, df_meta, by="subj")
+df <-  merge(df, df_meta, by="subj")
+df.RSD.long <-  merge(df.RSD.long, df_meta, by="subj")
 rm(df_meta)
 
 
 # Set variables that consist of most datapoints as reference variables
 df.CC.lag$gender <- relevel(df.CC.lag$gender, ref = "M")
 df.CC.lag$group <- relevel(df.CC.lag$group, ref = "CTRL")
+df.CC.lag$dialect <- as.factor(df.CC.lag$dialect)
 df.CC.lag$dialect <- relevel(df.CC.lag$dialect, ref = "Rest")
 
 saveRDS(df.CC.lag, file="modelling_data_CC.rds")
 saveRDS(df.RSD.long, file="modelling_data_RSD.rds")
+saveRDS(df, file="modelling_data.rds")
 ```
 
