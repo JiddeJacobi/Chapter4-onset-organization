@@ -1,5 +1,5 @@
 ---
-title: "C-center models"
+title: "Relationship between IPI and duration of C1/C2"
 output: 
   html_document: 
     number_sections: yes
@@ -13,7 +13,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Load required packages
+# Data preprocessing
+
+## Load required packages
 ```{r}
 library("tidyr")
 library("dplyr")
@@ -30,8 +32,6 @@ library("mgcv")
 library("itsadug")
 library("car")
 ```
-
-# Introduction
 
 
 ## Read data
@@ -268,6 +268,7 @@ visreg(durC_m12.ML.loglink3, "time.lag.norm", by = "whichC", overlay = F, points
 visreg(durC_m12.ML.loglink3, "time.lag.norm", by = "whichC", overlay = F, points = list(cex = 0.1), xlab = "normalized IPI", ylab = "normalized duration of C", gg = TRUE, cond=list(cluster = 'sx')) + theme_bw() # not clear
 
 ```
+
 # Session info
 ```{r}
 sessionInfo()
