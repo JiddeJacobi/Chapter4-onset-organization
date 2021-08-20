@@ -143,23 +143,17 @@ sp.CC <- df %>%
   rename(t5.p = t5) %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
   mutate(time.lag = t3.p-t5.s)  %>%
-  mutate(time.lag.norm = time.lag/duration.tt)  %>%
-  mutate(dur.C1 = (t5.s - t3.s)) %>%
-  mutate(dur.C2 = (t5.p - t3.p))  %>%
-  mutate(dur.C1.norm = dur.C1/duration.tt) %>%
-  mutate(dur.C2.norm = dur.C2/duration.tt)
-
+  mutate(time.lag.norm = time.lag/(t5.p - t3.s))  %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.p - t3.s)) %>%
+  mutate(dur.C2.norm = (t5.p - t3.p)/(t5.p - t3.s))
 
 
 sp.C1.plot <- ggplot(sp.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
-print(sp.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
-
+print(sp.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sp/", x = "Normalized IPI", y = "Normalized duration C1") + xlim(-1, 1) + ylim(0,1)) 
 cor.test(sp.CC$time.lag.norm, sp.CC$dur.C1.norm)
 
-
 sp.C2.plot <- ggplot(sp.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
-print(sp.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C2")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
-
+print(sp.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sp/", x = "Normalized IPI", y = "Normalized duration C2") + xlim(-1, 1) + ylim(0,1)) 
 cor.test(sp.CC$time.lag.norm, sp.CC$dur.C2.norm)
 
 
@@ -197,19 +191,18 @@ sm.CC <- df %>%
   rename(t3.m = t3, t5.m = t5)  %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
   mutate(time.lag = t3.m-t5.s) %>%
-  mutate(dur.C1 = (t5.s - t3.s)) %>%
-  mutate(dur.C2 = (t5.m - t3.m)) %>%
-  mutate(time.lag.norm = time.lag/duration.tt)  %>%
-  mutate(dur.C1.norm = dur.C1/duration.tt)  %>%
-  mutate(dur.C2.norm = dur.C2/duration.tt) 
-
+  mutate(time.lag.norm = time.lag/(t5.m - t3.s))  %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.m - t3.s))  %>%
+  mutate(dur.C2.norm = (t5.m - t3.m)/(t5.m - t3.s))
 
 
 sm.C1.plot <- ggplot(sm.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
-print(sm.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sm.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sm/", x = "Normalized IPI", y = "Normalized duration C1") + xlim(-1, 1) + ylim(0,1))
+cor.test(sm.CC$time.lag.norm, sm.CC$dur.C1.norm)
 
 sm.C2.plot <- ggplot(sm.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
-print(sm.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sm.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sm/", x = "Normalized IPI", y = "Normalized duration C2") + xlim(-1, 1) + ylim(0,1))
+cor.test(sm.CC$time.lag.norm, sm.CC$dur.C2.norm)
 
 
 rm(sm.C1.plot, sm.C2.plot)
@@ -245,11 +238,9 @@ sx.CC <- df %>%
   rename(t3.x = t3, t5.x = t5)  %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
   mutate(time.lag = t3.x-t5.s) %>%
-  mutate(time.lag.norm = time.lag/duration.tt) %>%
-  mutate(dur.C1 = (t5.s - t3.s))  %>%
-  mutate(dur.C2 = (t5.x - t3.x)) %>%
-  mutate(dur.C1.norm = dur.C1/duration.tt)  %>%
-  mutate(dur.C2.norm = dur.C2/duration.tt) %>%
+  mutate(time.lag.norm = time.lag/(t5.x - t3.s)) %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.x - t3.s))  %>%
+  mutate(dur.C2.norm = (t5.x - t3.x)/(t5.x - t3.s)) %>%
   filter(t3.x > t3.s)
  
 # remove trials where NONS /X/ preceeds /s/
@@ -258,10 +249,12 @@ sx.CC <- df %>%
 
 
 sx.C1.plot <- ggplot(sx.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
-print(sx.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sx.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C1, /sx/", x = "Normalized IPI", y = "Normalized duration C1") + xlim(-1, 1) + ylim(0,1))
+cor.test(sx.CC$time.lag.norm, sx.CC$dur.C1.norm)
 
 sx.C2.plot <- ggplot(sx.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
-print(sx.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sx.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(title = "Inter plateau interval vs. duration of C2, /sx/", x = "Normalized IPI", y = "Normalized duration C2") + xlim(-1, 1) + ylim(0,1))
+cor.test(sx.CC$time.lag.norm, sx.CC$dur.C2.norm)
 
 rm(sx.C1.plot, sx.C2.plot)
 
@@ -311,10 +304,10 @@ spr.CC <- df %>%
   inner_join(offset.s, by=c("subj", "recording.no")) %>%
   left_join(offset.p, by=c("subj", "recording.no")) %>%
   mutate(time.lag = t3.r-t5.s) %>%
-  mutate(time.lag.norm = time.lag/duration.tt) %>%
-  mutate(dur.C1.norm = (t5.s - t3.s)/duration.tt)  %>%
-  mutate(dur.C2.norm = (t5.p - t3.p)/duration.tt)  %>%
-  mutate(dur.C3.norm = (t5.r - t3.r)/duration.tt)
+  mutate(time.lag.norm = time.lag/(t5.r - t3.s)) %>%
+  mutate(dur.C1.norm = (t5.s - t3.s)/(t5.r - t3.s))  %>%
+  mutate(dur.C2.norm = (t5.p - t3.p)/(t5.r - t3.s))  %>%
+  mutate(dur.C3.norm = (t5.r - t3.r)/(t5.r - t3.s))
 
 
 
@@ -678,7 +671,7 @@ sp.rightedge <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "p") %>%
-  rename(rightedge = t5) %>%
+  rename(rightedge = t7) %>%
   select(subj, recording.no, rightedge) %>%
   drop_na()    
 ```
@@ -829,7 +822,7 @@ sm.rightedge <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "m") %>%
-  rename(rightedge = t5) %>%
+  rename(rightedge = t7) %>%
   select(subj, recording.no, rightedge) %>%
   drop_na()  
 ```
@@ -979,7 +972,7 @@ sx.rightedge <- df %>%
   group_by(subj) %>%
   group_by(recording.no) %>%
   filter(seg == "X") %>%
-  rename(rightedge = t5) %>%
+  rename(rightedge = t7) %>%
   select(subj, recording.no, rightedge) %>%
   drop_na()   
 ```
@@ -1440,8 +1433,8 @@ ggplot(df.RSD, aes(x=subj, y=RSD.C.center, fill = group)) + geom_boxplot()
 df.RSD.long <- df.RSD %>%
   group_by(subj, group, cluster) %>%
   gather(condition,RSD,c(RSD.leftedge, RSD.rightedge, RSD.C.center)) %>%
-  select(subj, group, cluster, condition, RSD) %>%
-  arrange(subj, group, cluster, condition,  RSD)
+  select(subj, group, cluster, condition, RSD, duration.tt, recording.no) %>%
+  arrange(subj, group, recording.no, cluster, condition,  RSD)
 
 df.RSD.long$subj <- as.factor(df.RSD.long$subj)
 df.RSD.long$subj <- droplevels(df.RSD.long$subj)
@@ -1460,20 +1453,6 @@ df.RSD %>%
 gather(condition,value,c(mean.leftedge, mean.rightedge, mean.C.center))
 ```
 
-# Check how many trials are used in C-center data
-```{r}
-
-# create df without spr
-df.C.center.nospr <- df.C.center [! df.C.center$cluster == "spr", ]
-df.C.center.nospr <- droplevels(df.C.center.nospr)
-levels(df.C.center.nospr$cluster)
-
-df.C.center.nospr <- df.C.center.nospr %>% drop_na(leftedge.lag, rightedge.lag, c.center.lag)
-
-df.C.center.speech.rate <- df.C.center.nospr %>%
-  group_by(subj, cluster) %>%
-  summarize(mean.sr = mean(duration.tt))
-```
 
 # Save data
 ```{r save}
@@ -1484,7 +1463,6 @@ df_meta <- read.csv("metadata.csv", header = TRUE, sep = ",")
 df_meta$gender <- as.factor(df_meta$gender)
 df.CC.lag <-  merge(df.CC.lag, df_meta, by="subj")
 df.C.center <-  merge(df.C.center, df_meta, by="subj")
-df.RSD.long <-  merge(df.RSD.long, df.C.center.speech.rate, by=c("subj", "cluster"))
 df.RSD.long <-  merge(df.RSD.long, df_meta, by="subj")
 rm(df_meta)
 
