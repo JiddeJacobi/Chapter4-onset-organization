@@ -1,0 +1,218 @@
+---
+title: "IPI"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library("tidyr")
+library("dplyr")
+library("stringr")
+library("car")
+library("visreg")
+library("optimx")
+library("ggplot2")
+library("optimx")
+library("mgcv")
+library("itsadug")
+library("car")
+```
+
+# Introduction
+From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C's is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we've included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable 'time.lag.norm' is the normalized time lag between the offset of the leftmost C and the onset of the rightmost C. If our hypothesis is correct the lag between the C's should be lower for the PD group in comparison with the controls.
+
+
+## Read data
+```{r save data}
+df <- readRDS("../data/modelling_data_CC.rds")
+```
+
+## Clean data
+Remove all the rows that have NA in the dependent variable and drop 'empty' levels, convert variables to factors and create trimmed dataset.
+```{r remove NA}
+df$subj <- as.factor(df$subj)
+
+df <- df[complete.cases(df$time.lag.norm),]
+df <- droplevels(df)
+
+# Sort data
+df <- df[order(df$subj, df$recording.no),]
+
+# convert to factors/numeric
+df$prompt <- as.factor(df$prompt)
+df$condition <- as.factor(df$condition)
+
+# remove all the recordings without a speech rate measure:
+# df <- df %>% drop_na(duration.tt)
+
+# remove participants with only a few datapoints
+#remove <- c("PD19", "CTRL19")
+#df.trim <- df[! df$subj %in% remove, ]
+#df.trim <- droplevels(df.trim)
+
+
+# create df without sx
+#df.trim <- df.trim[! df.trim$cluster == "sx", ]
+#df.trim <- droplevels(df.trim)
+#levels(df.trim$cluster)
+
+# create df without spr
+df.nospr <- df[! df$cluster == "spr", ]
+df.nospr <- droplevels(df.nospr)
+levels(df.nospr$cluster)
+df.nospr$cluster <- relevel(df.nospr$cluster, ref = "sm")
+
+
+
+# merge /sm/ and /sp/
+df.nospr$poa <- ifelse(df.nospr$cluster == "sx","C2lingual","C2bilabial")
+df.nospr$poa <- as.factor(df.nospr$poa)
+table(df.nospr$poa, df.nospr$cluster)
+
+
+```
+
+
+# GAM models for CC lag analysis (coarticulation)
+If indeed patients would show a stronger preference for inphase coordination, this would mean that they would produce the C gestures in the syllable's onset closer together in time. For this, we look at the lag between the gestural offset of the leftmost C and the gestural onset of the righmost C in complex clusters.
+
+## Hypothesis testing
+
+Fitting first model, smooth over subject:
+```{r}
+summary(m <- bam(time.lag.norm ~ s(subj, bs='re'), data=df.nospr, method = "ML"))
+```
+
+Adding group as fixed effect:
+```{r}
+summary(m1 <- bam(time.lag.norm ~ s(subj,bs='re') + group, data=df.nospr, method = "ML"))
+compareML(m,m1)
+```
+Sign. improvement.
+
+Fit final model
+```{r}
+summary(m1.REML <- bam(time.lag.norm ~ s(subj,bs='re') + group, data=df.nospr, method = "REML"))
+gam.check(m1)
+
+summary(m1.scat <- bam(time.lag.norm ~ s(subj,bs='re') + group, data=df.nospr, method = "fREML", family = "scat", discrete = T))
+gam.check(m1.scat)
+```
+
+
+## Exploratory analysis
+
+
+Adding cluster as fixed effect:
+```{r}
+summary(m2 <- bam(time.lag.norm ~ s(subj,bs='re') + cluster, data=df.nospr, method = "ML"))
+compareML(m,m2)
+```
+Improves.
+
+Adding cluster:group as fixed effect:
+```{r}
+summary(m3 <- bam(time.lag.norm ~ s(subj,bs='re') + cluster*group, data=df.nospr, method = "ML"))
+compareML(m2,m3)
+```
+Sign. improvement.
+
+
+Add by-subj random slopes for cluster
+```{r}
+summary(m3 <- bam(time.lag.norm ~ s(subj,bs='re') + cluster*group, data=df.nospr, method="REML")) #fit m3 using REML
+
+summary(m4 <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group, data=df.nospr, method="REML"))
+compareML(m3, m4)
+```
+We need the random slope.
+
+Let's start over with the new random effects structure:
+```{r}
+m4minusGroup <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster, data=df.nospr, method = "ML") #fit using ML
+m4withGroup <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group, data=df.nospr, method = "ML") #fit using ML
+compareML(m4minusGroup, m4withGroup)
+```
+We don't need group.
+
+Gender
+```{r}
+summary(m6 <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster + gender, data=df.nospr, method = "ML"))
+compareML(m4minusGroup, m6)
+```
+No need for gender.
+
+Add recording.no
+```{r}
+summary(m7 <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster + s(recording.no), data=df.nospr, method = "ML"))
+compareML(m4minusGroup, m7, suggest.report=T)
+```
+No improvement.
+
+Add age.
+```{r}
+summary(m8 <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster  + s(age), data=df.nospr, method = "ML"))
+compareML(m4minusGroup, m8)
+```
+No improvement.
+
+Add dialect.
+```{r}
+summary(m9 <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster + dialect, data=df.nospr, method = "ML"))
+compareML(m4minusGroup, m9)
+```
+No improvement.
+
+Try to add group once more:
+```{r}
+summary(m10 <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster + group, data=df.nospr, method = "ML"))
+compareML(m4minusGroup, m10)
+```
+No improvement.
+
+Try to add group*cluster interaction once more:
+```{r}
+summary(m11 <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster*group, data=df.nospr, method = "ML"))
+compareML(m4minusGroup, m11)
+```
+
+Fit final model:
+```{r}
+summary(m5REML <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re") + cluster, data=df.nospr, method = "REML"))
+```
+
+#### Visualize final model:
+```{r}
+gam.check(m5REML)
+qqp(resid(m5REML))
+plot(fitted(m5REML),resid(m5REML))
+
+summary(m5REML.scat <- bam(time.lag.norm ~ s(subj,bs='re') + s(subj, cluster, bs="re", k = 40) + cluster, data=df.nospr, method = 'fREML', family = "scat", discrete = T)) # cluster is not sign anymore
+gam.check(m5REML.scat) # looks a lot better
+qqp(resid(m5REML.scat))
+plot(fitted(m5REML.scat),resid(m5REML.scat)) # looks fine
+
+summary(m5REML.scat2 <- bam(time.lag.norm ~ s(subj,bs='re') + cluster, data=df.nospr, method = 'fREML', family = "scat", discrete = T))
+gam.check(m5REML.scat2)
+qqp(resid(m5REML.scat2))
+
+plot(fitted(m5REML.scat2),resid(m5REML.scat2)) # looks fine
+visreg(m5REML.scat2, view = "cluster", overlay = T, points = list(cex = 0.1), xlab = 'onset cluster', ylab = "inter plateau interval (ms)")
+```
+
+
+# Session info
+```{r}
+sessionInfo()
+```
+
