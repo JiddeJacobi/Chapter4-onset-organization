@@ -1,0 +1,445 @@
+---
+title: "Vowel compression"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+  # Load required packages
+```{r}
+library("tidyr");
+library("plyr");
+library("dplyr");
+library("ggplot2");
+library("visreg");
+library("mgcv");
+library("itsadug");
+```
+
+# Introduction 
+From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C's is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we've included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable 'rightedge.lag' is the time normalized (on a 0-1 scale) lag between consonant and vowel. 
+
+## Read data
+```{r save data}
+df <- readRDS("C:/Users/Jidde/Desktop/analysis/data/modelling_C_center.rds")
+df <- rename(df, onset_type = condition)
+df <- rename(df, item_pair = cluster)
+```
+
+## Convert factors and subset data
+```{r remove NA}
+# convert to factors/numeric:
+df$onset_type <- as.factor(df$onset_type)
+df$subj <- as.factor(df$subj)
+
+# remove all the recordings without a speech rate measure:
+df <- df %>% drop_na(duration.tt)
+
+# center duration.tt, so it's easier to interpret.
+df$duration.tt.c <- scale(df$duration.tt, scale = F)
+
+# Change order of levels in item_pair
+df$item_pair <- factor(df$item_pair, levels = c("sp", "sm", "sx", "spr"))
+
+# Sort data
+df <- df[order(df$subj, df$recording.no),]
+
+# Rename CTRL
+df$group <- revalue(df$group, c("CTRL"="typical"))
+df$group<- relevel(df$group, ref = "PD")
+
+# create df without spr:
+df.nospr <- df[! df$item_pair == "spr", ]
+df.nospr <- droplevels(df.nospr)
+levels(df.nospr$item_pair)
+
+table(df.nospr$subj, df.nospr$prompt)
+
+df.nospr$onset_type <- recode_factor(df.nospr$onset_type, C = "singleton", 
+                                CC = "cluster")
+rm(df)
+```
+
+Create ordered factors:
+```{r}
+df.nospr$group.ord <- as.ordered(df.nospr$group) 
+contrasts(df.nospr$group.ord) <- "contr.treatment" 
+
+df.nospr$gender.ord <- as.ordered(df.nospr$gender) 
+contrasts(df.nospr$gender.ord) <- "contr.treatment" 
+```
+
+Create binary dummy variables:
+```{r}
+df.nospr$IsTP <- (df.nospr$group == "typical")*1
+df.nospr$IsMale <- (df.nospr$gender == "M")*1
+```
+
+
+
+# GAM modelsfor rightward shift rightmost C
+In a CCV complex onset the rightmost C in the onset should show a rightward shift towards the vowel in comparison to the C in a CV onset. We hypothesize that this shift may be less pronounced for the patient group, as they may show a stronger preference for inphase coordination. In this analysis we compare /sp/ to /p/, /sm/ to /m/, /sx/ to /x/ and /spr/ to /pr/. As a start, I've included the 'item_pair' variable and the 'onset_type' (simple vs. complex onset) variable.
+
+## Some plots
+```{r}
+dodge = .5
+dodge <- position_dodge(width = 0.9)
+
+#right edge shift
+ggplot(df.nospr, aes(x=group, y=rightedge.lag, fill=onset_type)) + geom_violin() + geom_boxplot(width=.2, position = dodge) + labs(y = "right edge interval (ms)") + scale_fill_manual(values=c("#bfd8bf", "#bfd4ff")) + theme_bw()
+
+
+#ggplot(df.nospr[df.nospr$item_pair == "sp",], aes(x=group, y=rightedge.lag, fill=onset_type)) + geom_violin(trim=FALSE) + labs(y = "left edge interval (ms)") + geom_boxplot(width=.2, position = dodge) + scale_fill_manual(values=c("#bfd8bf", "#ffbfbf"))  + theme_bw()
+
+#ggplot(df.nospr[df.nospr$item_pair == "sm",], aes(x=group, y=rightedge.lag, fill=onset_type)) + geom_violin(trim=FALSE) + labs(y = "left edge interval (ms)") + geom_boxplot(width=.2, position = dodge) 
+
+#ggplot(df.nospr[df.nospr$item_pair == "sx",], aes(x=group, y=rightedge.lag, fill=onset_type)) + geom_violin(trim=FALSE) + labs(y = "left edge interval (ms)") + geom_boxplot(width=.2, position = dodge) 
+```
+
+## Hypothesis test
+
+Base model:
+```{r mBase, cache = T}
+summary(mBase <- bam(rightedge.lag ~ s(subj, bs='re'), data=df.nospr, method = "ML"))
+```
+OK.
+
+Add onset_type:
+```{r m1, cache = T}
+summary(m1 <- bam(rightedge.lag ~ onset_type + s(subj, bs='re'), data=df.nospr, method = "ML"))
+compareML(mBase, m1)
+```
+Yes.
+
+Check if we need to fit it with scaled-t or log:
+```{r m1scat, cache = T}
+summary(m1scat <- bam(rightedge.lag ~ onset_type + s(subj, bs='re'), data=df.nospr, family = "scat", discrete = T))
+summary(m1log <- bam(rightedge.lag ~ onset_type + s(subj, bs='re'), data=df.nospr, family =Gamma(link=log)))
+gam.check(m1scat)
+gam.check(m1log)
+```
+SCaled-t looks best.
+
+Add slopes:
+```{r m2, cache = T}
+summary(m2 <- bam(rightedge.lag ~ onset_type + s(subj, bs='re') + s(subj, onset_type, bs="re"), data=df.nospr, family = "scat", discrete = T))
+```
+No.
+
+Add group:
+```{r m3, cache = T}
+summary(m1ML <- bam(rightedge.lag ~ onset_type + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+
+summary(m3 <- bam(rightedge.lag ~ group + onset_type + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+
+compareML(m1ML, m3)
+```
+No.
+
+Add interaction:
+```{r mhypo, cache = T}
+summary(mhypo <- bam(rightedge.lag ~ group*onset_type + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+
+compareML(m1ML, mhypo)
+```
+Yes.
+
+Fit with REML, since it is the final model:
+```{r mhyporeml, cache = T}
+summary(mhypoREML <- bam(rightedge.lag ~ group*onset_type + s(subj, bs='re'), data=df.nospr, family = "scat"))
+```
+
+
+Check assumptions:
+```{r}
+gam.check(mhypoREML)
+```
+Fine.
+
+Model criticism, trimming:
+```{r}
+df.nospr2 <- df.nospr[abs(scale(resid(mhypoREML))) < 2.5, ] # trim model
+(1 - (nrow(df.nospr2))/nrow(df.nospr)) * 100
+```
+1.5% removed.
+
+
+Refit:
+```{r mhyporemltrim, cache = T}
+summary(mhypoREML_trim <- bam(rightedge.lag ~ s(subj, bs='re') + onset_type*group, data=df.nospr2, family = "scat"))
+gam.check(mhypoREML_trim)
+```
+OK.
+
+
+### Visualize final model:
+```{r}
+plot_parametric(mhypoREML_trim, cond = list(group= "PD"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(160,190))
+
+plot_parametric(mhypoREML_trim, cond = list(group= "typical"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(160,190))
+
+```
+
+## Exploratory analysis
+
+Adding item_pair as fixed effect:
+```{r m6, cache = T}
+summary(m5 <- bam(rightedge.lag ~ s(subj, bs='re') + onset_type*group, data=df.nospr, method = "ML", family = "scat"))
+summary(m6 <- bam(rightedge.lag ~ s(subj, bs='re') + item_pair + onset_type*group, data=df.nospr, method = "ML", family = "scat"))
+compareML(m5, m6)
+```
+Yes.
+
+Adding slopes for item_pair:
+```{r m7, cache = T}
+summary(m7.REML <- bam(rightedge.lag ~ s(subj, bs='re') + item_pair + onset_type*group + s(subj, item_pair, bs="re"), data=df.nospr, method = "fREML", family = "scat", discrete = T))
+```
+No.
+
+Adding onset_type*item_pair as fixed effect:
+```{r m8, cache = T}
+summary(m7.ML <- bam(rightedge.lag ~  group*onset_type + item_pair + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+summary(m8.ML <- bam(rightedge.lag ~  group*onset_type + onset_type*item_pair + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+compareML(m7.ML, m8.ML)
+```
+Yes, based on AIC.
+
+Adding item_pair*group as fixed effect:
+```{r m9 , cache = T}
+summary(m9.ML <- bam(rightedge.lag ~  group*onset_type + group*item_pair + onset_type*item_pair + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+compareML(m8.ML, m9.ML)
+```
+Yes (based on AIC)
+
+Add three-way interaction:
+```{r m9inter, cache = T}
+summary(m9.MLinter <- bam(rightedge.lag ~  group*onset_type*item_pair + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+compareML(m9.ML, m9.MLinter)
+```
+Yes.
+
+Add speechrate
+```{r m10, cache = T}
+summary(m10.ML <- bam(rightedge.lag ~  group*onset_type*item_pair + s(duration.tt) + s(subj, bs='re'), data=df.nospr, method = "ML", family = "scat"))
+compareML(m9.ML, m10.ML)
+```
+Yes, since AIC difference is larger than 2.
+
+Add random smooth.
+```{r m11, cache = T}
+summary(m11 <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) +  s(duration.tt, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", discrete=T, nthreads = 2))
+```
+Random smooth is not required. 
+
+Separate for group?
+```{r m12, cache = T}
+summary(m12 <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + s(duration.tt, by = IsTP), data=df.nospr, method = "fREML", family = "scat", discrete=T, nthreads = 2))
+```
+Yes.
+
+Add appropriate random smmooths:
+```{r m12sm, cache = T}
+summary(m12sm <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + s(duration.tt, by = IsTP)+ s(duration.tt, subj, bs="fs", m=1) +  s(duration.tt, subj, by = IsTP, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", discrete=T, nthreads = 2))
+```
+We need the smooths, but group diff. becomes non-sign.
+
+
+Add recording.no (check using select =T):
+```{r m13, cache = T}
+summary(m11.alt <- bam(rightedge.lag ~  group*onset_type*item_pair + s(duration.tt) + s(subj, bs = "re"), data=df.nospr, method = "fREML", family = "scat", select = T, discrete=T, nthreads = 2))
+
+summary(m13.alt <- bam(rightedge.lag ~  group*onset_type*item_pair + s(duration.tt) + s(recording.no) + s(subj, bs = "re"), data=df.nospr, method = "fREML", family = "scat", select= T, discrete=T, nthreads = 2))
+
+compareML(m11.alt, m13.alt)
+```
+Yes (based on AIC).
+
+
+Add random smooth:
+```{r m14, cache = T}
+summary(m14 <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", discrete=T, nthreads = 2))
+```
+We need the smooth.
+
+Check group difference:
+```{r m15, cache = T}
+summary(m15 <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + s(recording.no) + s(recording.no, by = IsTP) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", discrete=T, nthreads = 2))
+```
+No group difference.
+
+
+Add gender (using select = T)?
+```{r m16, cache = T}
+summary(m14.alt <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", select = T, discrete=T, nthreads = 2))
+
+summary(m16.alt <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + gender + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", select = T, discrete=T, nthreads = 2))
+compareML(m14.alt, m16.alt)
+```
+No, AIC diff is only 0.03.
+
+Interaction with group?
+```{r m17, cache = T}
+summary(m17.alt <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + group*gender + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", select = T, discrete=T, nthreads = 2))
+compareML(m14.alt, m17.alt)
+```
+No, AIC diff is only 0.15.
+
+Add age
+```{r m18, cache = T}
+summary(m18.alt <- bam(rightedge.lag ~ group*onset_type*item_pair + s(age) + s(duration.tt) + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", select = T, discrete=T, nthreads = 2))
+compareML(m14.alt, m18.alt)
+```
+No, AIC diff. is 0.04.
+
+Interaction with group?
+```{r m19, cache = T}
+summary(m19 <- bam(rightedge.lag ~  group*onset_type*item_pair + s(age) + s(age, by = IsTP) + s(duration.tt) + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", discrete=T, nthreads = 2))
+```
+No.
+
+As a constant effect (using select =T)?
+```{r m20, cache = T}
+summary(m20.alt <- bam(rightedge.lag ~  group*onset_type*item_pair + age*group + s(duration.tt) + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr, method = "fREML", family = "scat", select = T, discrete=T, nthreads = 2))
+compareML(m14.alt, m20.alt)
+```
+
+
+### Checking assumptions
+
+Final model:
+```{r}
+mFinal <- m14
+gam.check(mFinal)
+```
+Looks excellent.
+
+
+Model criticism, trimming:
+```{r}
+df.nospr3 <- df.nospr[abs(scale(resid(mFinal))) < 2.5, ] # trim model
+(1 - (nrow(df.nospr3))/nrow(df.nospr)) * 100
+```
+1.6% removed.
+
+Refit:
+```{r mfinaltrim, cache = T}
+summary(mFinal_trim <- bam(rightedge.lag ~ group*onset_type*item_pair + s(duration.tt) + s(recording.no) + s(recording.no, subj, bs="fs", m=1), data=df.nospr3, method = "fREML", family = "scat", discrete=T, nthreads = 2))
+```
+OK.
+
+
+Visualize:
+```{r}
+plot(mFinal_trim, select = 1, shade = T, rug = F, ylab = "right edge interval (ms)", xlab="speech interval duration (ms)")
+abline(h=0)
+
+plot(mFinal_trim, select = 2, shade = T, rug = F, ylab = "right edge interval (ms)", xlab="trial", ylim =c(-5,5))
+abline(h=0)
+       
+plot_parametric(mFinal_trim, cond = list(group= "PD", item_pair = "sp"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(150, 200)) 
+
+plot_parametric(mFinal_trim, cond = list(group= "PD", item_pair = "sm"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(150, 200)) 
+
+plot_parametric(mFinal_trim, cond = list(group= "PD", item_pair = "sx"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(150, 200)) 
+
+plot_parametric(mFinal_trim, cond = list(group= "typical", item_pair = "sp"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(150, 200)) 
+
+plot_parametric(mFinal_trim, cond = list(group= "typical", item_pair = "sm"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(150, 200)) 
+
+plot_parametric(mFinal_trim, cond = list(group= "typical", item_pair = "sx"), pred=list(onset_type = c("singleton", "cluster")), main = "", xlab = "right edge interval (ms)", xlim=c(150, 200)) 
+```
+
+
+# Latex table
+
+Latex table function:
+```{r}
+gamtabs2 <- function (model, caption = " ", label = "tab.gam", 
+    pnames = NA, snames = NA, ptab = NA, stab = NA, ...) 
+{
+    if (!requireNamespace("xtable", quietly = TRUE)) {
+        stop("Package 'xtable' needed for this function to work. Please install it.", 
+            call. = FALSE)
+    }
+    sum.gam <- model
+    if (!inherits(model, "summary.gam")) {
+        sum.gam <- summary(model)
+    }
+    if (is.na(ptab[1])) {
+        ptab = as.data.frame(sum.gam$p.table, stringsAsFactors = FALSE)
+    }
+    if (is.na(stab[1])) {
+        stab = as.data.frame(sum.gam$s.table, stringsAsFactors = FALSE)
+    }
+    if (!is.na(pnames[1])) {
+        rownames(ptab) = pnames
+    }
+    if (!is.na(snames[1])) {
+        rownames(stab) = snames
+    }
+    colnames(ptab)[4] = "p-value"
+    colnames(ptab)[3] = "t-value"
+    ptab.cnames = colnames(ptab)
+    stab.cnames = colnames(stab)
+    stab.cnames[3] = "F-value"
+    colnames(ptab) = c("A", "B", "C", "D")
+    if (ncol(stab) != 0) {
+        colnames(stab) = colnames(ptab)
+    }
+    tab = rbind(ptab, stab)
+    colnames(tab) = ptab.cnames
+    tab = round(tab, 4)
+    m = data.frame(matrix(0, nrow(tab), ncol(tab)), stringsAsFactors = FALSE)
+    for (i in 1:nrow(tab)) {
+        for (j in 1:4) {
+            if ((j == 4) & (tab[i, j] < 1e-03)) {
+                m[i, j] = "< 0.001"
+            }
+            else {
+                m[i, j] = sprintf("%3.3f", tab[i, j])
+            }
+        }
+    }
+    colnames(m) = colnames(tab)
+    rownames(m) = rownames(tab)
+    tab = m
+    tab2 = rbind(c(ptab.cnames), tab[1:nrow(ptab), ])
+    if (nrow(stab) > 0) {
+        tab2 = rbind(tab2, c(stab.cnames), tab[(nrow(ptab) + 
+            1):nrow(tab), ])
+    }
+    if (nrow(stab)) {
+        rownames(tab2)[(nrow(ptab) + 2)] = "B. smooth terms"
+    }
+    rownames(tab2)[1] = "A. parametric coefficients"
+    for (i in 1:nrow(tab2)) {
+        if (tab2[i, 4] == "0") 
+            tab2[i, 4] = "< 0.0001"
+        if (length(grep("\\.", tab2[i, 2])) == 0) 
+            tab2[i, 2] = paste(tab2[i, 2], ".0000", sep = "")
+    }
+    print(xtable::xtable(tab2, caption = caption, label = label, 
+        align = "lrrrr"), include.colnames = FALSE, hline.after = c(0, 
+        (nrow(ptab) + 1), nrow(tab2)), ...)
+}
+```
+
+Latex table:
+```{r}
+options(xtable.comment = FALSE)
+gamtabs2(mFinal_trim)
+```
+
+
+# Session info
+```{r}
+sessionInfo()
+```
+

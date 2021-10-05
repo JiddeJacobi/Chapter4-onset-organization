@@ -1,0 +1,383 @@
+---
+title: "C-center RSD models"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Preprocessing
+
+## Load required packages
+```{r}
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(lme4)
+library(car)
+library(visreg)
+library(ggplot2)
+library(mgcv)
+library(itsadug)
+```
+
+
+
+## Read data
+```{r save data}
+df <- readRDS("C:/Users/Jidde/Desktop/analysis/data/modelling_data_RSD.rds")
+df <- rename(df, interval_type = condition)
+```
+
+
+## Tweak data
+```{r}
+# Change order of levels in cluster
+df$cluster <- factor(df$cluster, levels = c("sp", "sm", "sx", "spr"))
+df <- subset(df, RSD != 0)
+
+# create df without spr
+df<- df[! df$cluster == "spr", ]
+df <- droplevels(df)
+levels(df$cluster)
+df$group <- recode_factor(df$group, CTRL = "typical")
+df$group<- relevel(df$group, ref = "PD")
+
+```
+
+Create ordered factors:
+```{r}
+df$group.ord <- as.ordered(df$group) 
+contrasts(df$group.ord) <- "contr.treatment" 
+```
+
+
+Create binary dummy variables:
+```{r}
+df$IsTP <- (df$group == "typical")*1
+```
+
+
+Visualize:
+```{r}
+dodge = .5
+
+ggplot(df, aes(x=interval_type, y=RSD, fill=interval_type)) + geom_violin()  + geom_boxplot(width=.2) + labs(y = "relative standard deviation (RSD)")  + scale_fill_manual(values=c("#bfd8bf", "#ffbfbf", "#bfd4ff")) + theme_bw()
+
+ggplot(df[df$group =="typical",], aes(x=interval_type, y=RSD, fill=interval_type)) + geom_violin()  + geom_boxplot(width=.2) + labs(y = "relative standard deviation (RSD)")  + scale_fill_manual(values=c("#bfd8bf", "#ffbfbf", "#bfd4ff")) + theme_bw()
+
+ggplot(df[df$group =="PD",], aes(x=interval_type, y=RSD, fill=interval_type)) + geom_violin()  + geom_boxplot(width=.2) + labs(y = "relative standard deviation (RSD)")  + scale_fill_manual(values=c("#bfd8bf", "#ffbfbf", "#bfd4ff")) + theme_bw()
+```
+
+# GAM models for RSD analysis
+
+## Hypothesis test
+Base model:
+```{r hypo, cache =T}
+summary(mhypo <- bam(RSD ~ s(subj, bs='re'), data=df, method = "ML"))
+```
+
+Add interval_type?
+```{r mhypointervaltype, cache =T}
+summary(mhypointerval_type <- bam(RSD ~ interval_type + s(subj, bs='re'), data=df, method = "ML"))
+compareML(mhypo, mhypointerval_type)
+```
+Yes.
+
+
+Random slopes?
+```{r mhyposlopes, cache =T}
+summary(mhypoSlopes <- bam(RSD ~ interval_type + s(subj, bs='re') + s(subj, interval_type, bs='re'), data=df, method = "REML"))
+```
+No.
+
+
+Scaled t?
+```{r mhypo2_scat, cache =T}
+summary(mhypo2_scat <- bam(RSD ~ interval_type + s(subj, bs='re'), data=df, method ="fREML", family = "scat", discrete = T))
+gam.check(mhypo2_scat)
+```
+
+Log?
+```{r mhypo2log, cache =T}
+summary(mhypo2_log <- bam(RSD ~ interval_type + s(subj, bs='re'), data=df, family =Gamma(link=log)))
+gam.check(mhypo2_log)
+```
+Looks best.
+
+Model criticism, trimming:
+```{r}
+df2 <- df[abs(scale(resid(mhypo2_log))) < 2.5, ] # trim model
+(1 - (nrow(df2))/nrow(df)) * 100
+```
+2.2% removed.
+
+
+Refit:
+```{r mhypo2logtrim, cache =T}
+summary(mhypo2_log_trim <- bam(RSD ~ interval_type +s(subj, bs='re'), data=df2, family =Gamma(link=log)))
+gam.check(mhypo2_log_trim)
+```
+
+Plot:
+```{r}
+plot_parametric(mhypo2_log_trim, pred=list(interval_type = c("left edge", "C-center", "right edge")), main = "", xlab = "relative standard deviation (RSD)", xlim=c(1.5,3.5))
+```
+
+
+## Exploratory analysis
+
+Add group?
+```{r mgroup, cache = T}
+summary(mhypo2_log_trim_ML <- bam(RSD ~ interval_type + s(subj, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+
+summary(mgroup <- bam(RSD ~ group + interval_type + s(subj, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(mhypo2_log_trim_ML, mgroup)
+```
+No.
+
+
+Add group in interaction with interval type?
+```{r mgroupinter, cache = T}
+summary(mgroupinter <- bam(RSD ~ group*interval_type + s(subj, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(mhypo2_log_trim_ML, mgroupinter)
+```
+No.
+
+
+Adding cluster as fixed effect:
+```{r ex1, cache =T}
+summary(ex1 <- bam(RSD ~ s(subj, bs='re') + cluster + interval_type, data=df, family =Gamma(link=log), method = "ML"))
+compareML(mhypo2_log_trim_ML, ex1)
+```
+Sign. improvement.
+
+
+Adding slopes:
+```{r ex2, cache =T}
+summary(ex2 <- bam(RSD ~   interval_type + cluster + s(subj, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log)))
+```
+Yes.
+
+
+Check once more if we need slopes for interval_type
+```{r excondslopes, cache =T}
+summary(ex_cond_slopes <- bam(RSD ~ interval_type + cluster + s(subj, bs='re') +  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log)))
+```
+We do.
+
+
+Adding interval_type*cluster interaction:
+```{r ex4, cache =T}
+summary(ex3 <- bam(RSD ~   interval_type + cluster + s(subj, bs='re') + s(subj, interval_type, bs='re') + s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+
+summary(ex4 <- bam(RSD ~   interval_type + interval_type*cluster + s(subj, bs='re') +  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(ex3,ex4)
+```
+Sign. improvement.
+
+
+Add speech rate
+```{r ex5, cache =T}
+summary(ex5 <- bam(RSD ~ interval_type + interval_type*cluster + s(mean.sr) + s(subj, bs='re') +  s(subj, interval_type, bs='re')+  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(ex4, ex5)
+```
+No improv.
+
+
+Add speech rate separate for group?
+```{r ex6, cache =T}
+summary(ex6 <- bam(RSD ~   group.ord + interval_type + interval_type*cluster + s(mean.sr, by = IsTP) + s(subj, bs='re') +  s(subj, interval_type, bs='re') + s(subj, cluster, bs='re'), data=df, family =Gamma(link=log)))
+```
+No.
+
+
+Add gender
+```{r ex7, cache =T}
+summary(ex7 <- bam(RSD ~   interval_type + interval_type*cluster + gender + s(subj, bs='re')+  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(ex4, ex7)
+```
+No sign. improvement.
+
+
+In interaction with group?
+```{r ex7inter, cache =T}
+summary(ex7inter <- bam(RSD ~   interval_type + interval_type*cluster + gender*group + s(subj, bs='re')+  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(ex4, ex7inter)
+```
+No improv.
+
+
+Add age
+```{r ex8, cache =T}
+summary(ex8 <- bam(RSD ~   interval_type + interval_type*cluster + s(age) + s(subj, bs='re')+  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(ex4, ex8)
+```
+Becomes worse.
+
+
+In interaction with group?
+```{r ex8inter, cache =T}
+summary(ex8inter <- bam(RSD ~   interval_type + interval_type*cluster + s(age, by = IsTP) + s(subj, bs='re')+  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log)))
+```
+No improv.
+
+
+Add interaction cluster x group
+```{r ex10, cache =T}
+summary(ex10 <- bam(RSD ~  interval_type + group*cluster + interval_type*cluster + s(subj, bs='re') +  s(subj, interval_type, bs='re')+  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(ex4, ex10)
+```
+No sign. improvement.
+
+
+Add threeway interaction:
+```{r ex11, cache =T}
+summary(ex11 <- bam(RSD ~  group*interval_type*cluster + s(subj, bs='re') +  s(subj, interval_type, bs='re')+  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+compareML(ex4, ex11)
+```
+No.
+
+
+Check if we need interaction between interval_type and group?
+```{r ex12, cache =T}
+summary(ex12 <- bam(RSD ~   interval_type*group + interval_type*cluster + s(subj, bs='re') +  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+
+compareML(ex4, ex12)
+```
+No, so we leave it out in the final model.
+
+
+Add cluster in interaction with group:
+```{r ex13, cache =T}
+summary(ex13 <- bam(RSD ~ interval_type + interval_type*cluster + group*cluster + s(subj, bs='re') +  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log), method = "ML"))
+
+compareML(ex4, ex13)
+```
+
+
+
+## Checking assumptions
+
+Fit final model using REML and check assumptions:
+```{r ex5reml, cache =T}
+summary(ex5REML <- bam(RSD ~   interval_type*cluster + s(subj, bs='re')+  s(subj, interval_type, bs='re') +  s(subj, cluster, bs='re'), data=df, family =Gamma(link=log)))
+gam.check(ex5REML)
+```
+
+
+Model criticism, trimming:
+```{r}
+df3 <- df[abs(scale(resid(ex5REML))) < 2.5, ] # trim model
+(1 - (nrow(df3))/nrow(df)) * 100
+```
+2.2% data removed.
+
+
+Refit:
+```{r ex5remltrim, cache =T}
+summary(ex5REML_trim <- bam(RSD ~   interval_type*cluster + s(subj, bs='re') +  s(subj, cluster, bs='re')+  s(subj, interval_type, bs='re') , data=df3, family =Gamma(link=log)))
+gam.check(ex5REML_trim)
+```
+Same pattern.
+
+
+Visualize:
+```{r}
+plot_parametric(ex5REML_trim, cond = list(cluster = "sp"), pred=list(interval_type = c("left edge", "C-center", "right edge")), main = "", xlab = "relative standard deviation (RSD)", xlim=c(1.5,3.5))
+plot_parametric(ex5REML_trim, cond = list(cluster = "sm"), pred=list(interval_type = c("left edge", "C-center", "right edge")), main = "", xlab = "relative standard deviation (RSD)", xlim=c(1.5,3.5))
+plot_parametric(ex5REML_trim, cond = list(cluster = "sx"), pred=list(interval_type = c("left edge", "C-center", "right edge")), main = "", xlab = "relative standard deviation (RSD)", xlim=c(1.5,3.5))
+```
+
+# Latex table
+
+Latex table function:
+```{r}
+gamtabs2 <- function (model, caption = " ", label = "tab.gam", 
+    pnames = NA, snames = NA, ptab = NA, stab = NA, ...) 
+{
+    if (!requireNamespace("xtable", quietly = TRUE)) {
+        stop("Package 'xtable' needed for this function to work. Please install it.", 
+            call. = FALSE)
+    }
+    sum.gam <- model
+    if (!inherits(model, "summary.gam")) {
+        sum.gam <- summary(model)
+    }
+    if (is.na(ptab[1])) {
+        ptab = as.data.frame(sum.gam$p.table, stringsAsFactors = FALSE)
+    }
+    if (is.na(stab[1])) {
+        stab = as.data.frame(sum.gam$s.table, stringsAsFactors = FALSE)
+    }
+    if (!is.na(pnames[1])) {
+        rownames(ptab) = pnames
+    }
+    if (!is.na(snames[1])) {
+        rownames(stab) = snames
+    }
+    colnames(ptab)[4] = "p-value"
+    colnames(ptab)[3] = "t-value"
+    ptab.cnames = colnames(ptab)
+    stab.cnames = colnames(stab)
+    stab.cnames[3] = "F-value"
+    colnames(ptab) = c("A", "B", "C", "D")
+    if (ncol(stab) != 0) {
+        colnames(stab) = colnames(ptab)
+    }
+    tab = rbind(ptab, stab)
+    colnames(tab) = ptab.cnames
+    tab = round(tab, 4)
+    m = data.frame(matrix(0, nrow(tab), ncol(tab)), stringsAsFactors = FALSE)
+    for (i in 1:nrow(tab)) {
+        for (j in 1:4) {
+            if ((j == 4) & (tab[i, j] < 1e-03)) {
+                m[i, j] = "< 0.001"
+            }
+            else {
+                m[i, j] = sprintf("%3.3f", tab[i, j])
+            }
+        }
+    }
+    colnames(m) = colnames(tab)
+    rownames(m) = rownames(tab)
+    tab = m
+    tab2 = rbind(c(ptab.cnames), tab[1:nrow(ptab), ])
+    if (nrow(stab) > 0) {
+        tab2 = rbind(tab2, c(stab.cnames), tab[(nrow(ptab) + 
+            1):nrow(tab), ])
+    }
+    if (nrow(stab)) {
+        rownames(tab2)[(nrow(ptab) + 2)] = "B. smooth terms"
+    }
+    rownames(tab2)[1] = "A. parametric coefficients"
+    for (i in 1:nrow(tab2)) {
+        if (tab2[i, 4] == "0") 
+            tab2[i, 4] = "< 0.0001"
+        if (length(grep("\\.", tab2[i, 2])) == 0) 
+            tab2[i, 2] = paste(tab2[i, 2], ".0000", sep = "")
+    }
+    print(xtable::xtable(tab2, caption = caption, label = label, 
+        align = "lrrrr"), include.colnames = FALSE, hline.after = c(0, 
+        (nrow(ptab) + 1), nrow(tab2)), ...)
+}
+```
+
+Latex table:
+```{r}
+options(xtable.comment = FALSE)
+gamtabs2(ex5REML_trim)
+```
+
+
+# Session info
+```{r}
+sessionInfo()
+```

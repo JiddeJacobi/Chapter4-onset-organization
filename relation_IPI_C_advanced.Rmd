@@ -1,0 +1,549 @@
+---
+title: "Relationship between IPI and duration of C1/C2"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data preprocessing
+
+## Load required packages
+```{r}
+library("tidyr")
+library("dplyr")
+library("stringr")
+library("car")
+library("ggplot2")
+library("mgcv")
+library("itsadug")
+```
+
+
+## Read data
+```{r save data}
+df <- readRDS("C:/Users/Jidde/Desktop/analysis/data/modelling_data_CC.rds")
+df <- rename(df, IPI = time.lag.norm)
+```
+
+## Clean data
+Remove all the rows that have NA in the dependent variable and drop 'empty' levels, convert variables to factors and create trimmed dataset.
+```{r remove NA}
+df$subj <- as.factor(df$subj)
+
+df <- df[complete.cases(df$IPI),]
+df <- droplevels(df)
+
+# Sort data
+df <- df[order(df$subj, df$recording.no),]
+
+# convert to factors/numeric
+df$prompt <- as.factor(df$prompt)
+df$condition <- as.factor(df$condition)
+
+
+# remove all the recordings without a speech rate measure:
+# df <- df %>% drop_na(duration.tt)
+
+# remove participants with only a few datapoints
+#remove <- c("PD19", "CTRL19")
+#df.trim <- df[! df$subj %in% remove, ]
+#df.trim <- droplevels(df.trim)
+
+
+# create df without sx
+#df.trim <- df.trim[! df.trim$cluster == "sx", ]
+#df.trim <- droplevels(df.trim)
+#levels(df.trim$cluster)
+
+# create df without spr
+df.nospr <- df[! df$cluster == "spr", ]
+df.nospr <- droplevels(df.nospr)
+levels(df.nospr$cluster)
+df.nospr$cluster <- relevel(df.nospr$cluster, ref = "sm")
+
+
+
+# merge /sm/ and /sp/
+df.nospr$c2type <- ifelse(df.nospr$cluster == "sx","lingual C2","labial C2")
+df.nospr$c2type <- as.factor(df.nospr$c2type)
+table(df.nospr$c2type, df.nospr$cluster)
+
+df.nospr$condition <- recode_factor(df.nospr$condition, C = "singleton", 
+                                CC = "cluster")
+
+df.nospr$group <- recode_factor(df.nospr$group, CTRL = "typical")
+df.nospr$group<- relevel(df.nospr$group, ref = "PD")
+
+
+rm(df)
+```
+
+Create one var for duration of C1/C2
+```{r}
+df.nospr <- df.nospr %>%
+  gather(whichC, durationC, dur.C1.norm, dur.C2.norm) %>%
+  arrange(subj, group, recording.no)
+
+df.nospr$whichC <- as.factor(df.nospr$whichC)
+
+#df.nospr$durationC <- df.nospr$durationC - mean(df.nospr$durationC) # center continues variable
+df.nospr$cluster <- relevel(df.nospr$cluster, ref = "sx")
+df.nospr$whichC <- relevel(df.nospr$whichC, ref = "dur.C1.norm")
+df.nospr$whichC <- recode_factor(df.nospr$whichC, dur.C1.norm = "initial", 
+                                dur.C2.norm = "prevocalic")
+```
+
+Create binary dummy variables:
+```{r}
+df.nospr$IsC2 <- (df.nospr$whichC == "prevocalic")*1
+df.nospr$IsTP <- (df.nospr$group == "typical")*1
+df.nospr$IsSm = (df.nospr$cluster == "sm")*1
+df.nospr$IsSx = (df.nospr$cluster == "sx")*1
+df.nospr$IsC2lin = (df.nospr$cluster == "sx")*1
+
+df.nospr$IsTP_C2 = (df.nospr$whichC == "prevocalic" & df.nospr$group == "typical")*1
+df.nospr$IsPD_C2 = (df.nospr$whichC == "prevocalic" & df.nospr$group == "PD")*1
+
+df.nospr$IsTP_C2lin = (df.nospr$cluster == "sx" & df.nospr$group == "typical")*1
+```
+
+
+Create ordered factor:
+```{r}
+df.nospr$group.ord <- as.ordered(df.nospr$group) 
+contrasts(df.nospr$group.ord) <- "contr.treatment" 
+
+df.nospr$whichC.ord <- as.ordered(df.nospr$whichC) 
+contrasts(df.nospr$whichC.ord) <- "contr.treatment" 
+
+df.nospr$cluster.ord <- as.ordered(df.nospr$cluster) 
+contrasts(df.nospr$cluster.ord) <- "contr.treatment" 
+
+df.nospr$gender.ord <- as.ordered(df.nospr$gender) 
+contrasts(df.nospr$gender.ord) <- "contr.treatment" 
+
+df.nospr$c2type.ord <- as.ordered(df.nospr$c2type) 
+contrasts(df.nospr$c2type.ord) <- "contr.treatment" 
+
+df.nospr$TPlingual.ord <- as.ordered(df.nospr$group =="typical" & df.nospr$c2type == "lingual C2") 
+contrasts(df.nospr$TPlingual.ord) <- "contr.treatment" 
+
+df.nospr$PDlingual.ord <- as.ordered(df.nospr$group =="PD" & df.nospr$c2type == "lingual C2") 
+contrasts(df.nospr$TPlingual.ord) <- "contr.treatment" 
+
+df.nospr$c2type_group <- interaction(df.nospr$c2type, df.nospr$group)
+df.nospr$c2type_group.ord <- as.ordered(df.nospr$c2type_group) 
+contrasts(df.nospr$c2type_group.ord) <- "contr.treatment" 
+```
+
+
+## Hypothesis testing
+
+Base model:
+```{r}
+summary(mBase <- bam(durationC ~ s(subj, bs = "re"), data = df.nospr, method = "ML"))
+```
+OK.
+
+Add smooth over IPI
+```{r}
+summary(m1 <- bam(durationC ~ s(IPI) + s(subj, bs = "re"), data = df.nospr, method = "ML"))
+compareML(mBase, m1)
+```
+Yes.
+
+Add random smooth?
+```{r}
+summary(m2 <- bam(durationC ~ s(IPI) + s(IPI, subj, bs = "fs", m =1), data = df.nospr, discrete = T, nthreads = 2))
+```
+Yes.
+
+Plot
+```{r hypo, cache = T}
+plot_smooth(m2, view = "IPI")
+```
+
+Check:
+```{r}
+gam.check(m2)
+```
+
+Looks heavily right skewed.
+
+Fit with log:
+```{r hypolog, cache = T}
+summary(m2_log <- bam(durationC ~ s(IPI) + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+
+gam.check(m2_log)
+```
+Looks a bit better.
+
+Compare model with and without IPI using the right (log) distribution:
+```{r compareIPI, cache = T}
+summary(mBaseLog <- bam(durationC ~ s(subj, bs = "re"), data = df.nospr, family =Gamma(link=log), method = "ML"))
+
+summary(mHypolog <- bam(durationC ~ s(IPI) + s(subj, bs = "re"), data = df.nospr, family =Gamma(link=log), method = "ML"))
+
+compareML(mBaseLog, mHypolog)
+```
+
+
+
+Model criticism, trimming:
+```{r }
+df.nospr2 <- df.nospr[abs(scale(resid(m2_log))) < 2.5, ] # trim model
+(1 - (nrow(df.nospr2))/nrow(df.nospr)) * 100
+```
+0.5% removed.
+
+Refit:
+```{r hypotrim, cache = T}
+summary(hypo_log_trim <- bam(durationC ~ s(IPI) + s(IPI, subj, bs = "fs", m =1), data = df.nospr2, family =Gamma(link=log), discrete = T, nthreads = 2))
+gam.check(hypo_log_trim)
+```
+OK.
+
+Visualize:
+```{r}
+#Plot using ordered factor:
+summary(mplot <- bam(durationC ~ group.ord + s(IPI) + s(IPI, subj, bs = "fs", m =1), data = df.nospr2, family =Gamma(link=log), discrete = T, nthreads = 2))
+
+plot(mplot, select = 1, shade = T, rug = F, ylab = "duration consonant (ms)", xlab = "IPI (ms)")
+abline(h=0)
+```
+# GAM models
+
+## Exploraratory testing
+
+Add group:
+```{r ex0, cache = T}
+summary(m2_log.alt <- bam(durationC ~ s(IPI) + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+summary(ex0.alt <- bam(durationC ~ group + s(IPI) + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(m2_log.alt, ex0.alt)
+```
+
+
+Binary smooth for each group over IPI?
+```{r exgroupsm, cache = T}
+summary(mGroupBin<- bam(durationC ~ s(IPI) + s(IPI, by = IsTP) + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+
+
+
+Add whichC (compare using select = T)
+```{r ex1, cache = T}
+summary(ex1.alt <- bam(durationC ~ s(IPI) + whichC + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(m2_log.alt, ex1.alt)
+```
+Yes.
+
+
+Add slopes
+```{r ex2, cache = T}
+summary(ex2 <- bam(durationC ~ s(IPI) + whichC + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+Required.
+
+
+Add cluster:
+```{r ex4, cache = T}
+summary(ex2.alt <- bam(durationC ~ s(IPI) + whichC + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+summary(ex3.alt <- bam(durationC ~ s(IPI) + whichC + cluster + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex2.alt, ex3.alt)
+```
+No.
+
+
+In interaction with group?
+```{r}
+summary(ex4.alt <- bam(durationC ~ s(IPI) + whichC + group*cluster + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex2.alt, ex4.alt)
+```
+No.
+
+
+Add c2type?
+```{r ex5alt, cache = T}
+summary(ex5.alt <- bam(durationC ~ s(IPI) + whichC + c2type + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex2.alt, ex5.alt)
+```
+No.
+
+
+In interaction with group?
+```{r ex6alt, cache = T}
+summary(ex6.alt <- bam(durationC ~ s(IPI) + whichC + group*c2type + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex2.alt, ex6.alt)
+```
+No.
+
+
+Add recording.no:
+```{r ex9, cache = T}
+summary(ex5.alt <- bam(durationC ~ s(IPI) + whichC + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+summary(ex6.alt <- bam(durationC ~ s(IPI) + whichC + s(recording.no) + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex5.alt, ex6.alt)
+```
+No.
+
+
+Separate for group?
+```{r ex11, cache = T}
+summary(ex7 <- bam(durationC ~ s(IPI) + whichC + s(recording.no) + s(recording.no, by = IsTP) + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+No.
+
+
+Add gender:
+```{r ex12, cache = T}
+summary(ex8.alt <- bam(durationC ~ s(IPI) + whichC + gender + s(subj, whichC, bs="re") +  s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex5.alt, ex8.alt)
+```
+No.
+
+
+Add gender in interaction with group?
+```{r ex13, cache = T}
+summary(ex9.alt <- bam(durationC ~ s(IPI) + whichC + group*gender + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex5.alt, ex9.alt)
+```
+No.
+
+
+Add age:
+```{r ex14, cache = T}
+summary(ex10.alt <- bam(durationC ~ s(IPI) + whichC  + s(age) + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex5.alt, ex10.alt)
+```
+No improvement.
+
+
+In interaction with group:
+```{r ex15, cache = T}
+summary(ex10.alt <- bam(durationC ~ s(IPI) + whichC + s(age) + s(age, by = IsTP) + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+No improvement.
+
+
+Check once more if we need IPI for group?
+```{r ex16, cache=T }
+summary(ex11 <- bam(durationC ~ s(IPI) + s(IPI, by = IsTP) + whichC + s(subj, whichC, bs="re") + s(IPI, subj, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+No.
+
+
+Separate smooth over IPI for each level of whichC (including appropriate random smooth)?
+```{r exsep, cache=T}
+summary(ex11 <- bam(durationC ~ s(IPI) + s(IPI, by = IsC2) + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+Yes.
+
+
+Separate per group?
+```{r exsepgroup, cache=T}
+summary(ex12 <- bam(durationC ~ group + s(IPI, by = group) + s(IPI, by = IsTP_C2) + s(IPI, by = IsPD_C2) + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+Both groups distinguish C1 from C2.
+
+
+Check if this there as a difference between groups:
+```{r exdiffsepgroup, cache=T}
+summary(ex12 <- bam(durationC ~ group + s(IPI, by = group) + s(IPI, by = IsC2) + s(IPI, by = IsTP_C2)  + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+No difference between the groups.
+
+
+Check once more whether we need cluster:
+```{r ex13cluster, cache=T}
+summary(ex11.alt <- bam(durationC ~ s(IPI) + s(IPI, by = IsC2) + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+summary(ex13.alt <- bam(durationC ~ s(IPI) + s(IPI, by = IsC2) + cluster + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex11.alt, ex13.alt)
+```
+No.
+
+
+In interaction with group?
+```{r ex14cluster, cache=T}
+summary(ex14.alt <- bam(durationC ~ s(IPI) + s(IPI, by = IsC2) + cluster*group + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex11.alt, ex14.alt)
+```
+No.
+
+
+Check once more whether we need c2type:
+```{r ex15.alt, cache=T}
+summary(ex15.alt <- bam(durationC ~ s(IPI) + s(IPI, by = IsC2) + c2type + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex11.alt, ex15.alt)
+```
+No.
+
+
+Check once more whether we need c2type x group:
+```{r ex16.alt, cache=T}
+summary(ex16.alt <- bam(durationC ~ group*c2type + s(IPI) + s(IPI, by = IsC2) + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), select = T, discrete = T, nthreads = 2))
+
+compareML(ex11.alt, ex16.alt)
+```
+Yes.
+
+
+Add slopes?
+```{r ex17slop, cache = T}
+summary(ex17 <- bam(durationC ~ group*c2type + s(IPI) + s(IPI, by = IsC2) + s(subj, c2type, bs = "re") + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+Yes.
+
+
+Final model using ordered factors (in order to distinguish constant from non-linear diff:
+```{r finalord, cache=T} 
+summary(Final.ord <- bam(durationC ~ group*c2type + whichC.ord + s(IPI) + s(IPI, by = whichC.ord)  + s(subj, c2type, bs = "re") + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+
+
+# Check assumptions
+
+Fit ordered factor model without separate smooths over IPI per group:
+```{r exFinal, cache = T}
+mFinal.ord <- Final.ord
+```
+
+
+Check:
+```{r}
+gam.check(mFinal.ord)
+```
+Fine.
+
+Model criticism, trimming:
+```{r}
+df.nospr3 <- df.nospr[abs(scale(resid(mFinal.ord))) < 2.5, ] # trim model
+(1 - (nrow(df.nospr3))/nrow(df.nospr)) * 100
+```
+2.7% gets removed.
+
+Refit:
+```{r exFinaltrim, cache = T}
+summary(Final.ord_trim <- bam(durationC ~ group*c2type + whichC.ord + s(IPI) + s(IPI, by = whichC.ord)  + s(subj, c2type, bs = "re") + s(IPI, subj, bs = "fs", m =1) + s(IPI, subj, by = whichC.ord, bs = "fs", m =1), data = df.nospr3, family =Gamma(link=log), discrete = T, nthreads = 2))
+```
+same pattern
+
+Visualize:
+```{r}
+plot_parametric(Final.ord_trim, cond = list(group = "PD"), pred=list(c2type = c("labial C2", "lingual C2")), main = "", xlab = "duration consonants (ms)", xlim=c(-4.1,-3.4))
+
+plot_parametric(Final.ord_trim, cond = list(group = "typical"), pred=list(c2type = c("labial C2", "lingual C2")), main = "", xlab = "duration consonants (ms)", xlim=c(-4.1,-3.4))
+
+
+plot_smooth(Final.ord_trim, view="IPI", plot_all="whichC.ord", rm.ranef=TRUE, xlab = "IPI (ms)", col=c("red", "darkgreen"), ylab = "duration consonant (ms)", rug=F)
+```
+
+
+Latex table function:
+```{r}
+gamtabs2 <- function (model, caption = " ", label = "tab.gam", 
+    pnames = NA, snames = NA, ptab = NA, stab = NA, ...) 
+{
+    if (!requireNamespace("xtable", quietly = TRUE)) {
+        stop("Package 'xtable' needed for this function to work. Please install it.", 
+            call. = FALSE)
+    }
+    sum.gam <- model
+    if (!inherits(model, "summary.gam")) {
+        sum.gam <- summary(model)
+    }
+    if (is.na(ptab[1])) {
+        ptab = as.data.frame(sum.gam$p.table, stringsAsFactors = FALSE)
+    }
+    if (is.na(stab[1])) {
+        stab = as.data.frame(sum.gam$s.table, stringsAsFactors = FALSE)
+    }
+    if (!is.na(pnames[1])) {
+        rownames(ptab) = pnames
+    }
+    if (!is.na(snames[1])) {
+        rownames(stab) = snames
+    }
+    colnames(ptab)[4] = "p-value"
+    colnames(ptab)[3] = "t-value"
+    ptab.cnames = colnames(ptab)
+    stab.cnames = colnames(stab)
+    stab.cnames[3] = "F-value"
+    colnames(ptab) = c("A", "B", "C", "D")
+    if (ncol(stab) != 0) {
+        colnames(stab) = colnames(ptab)
+    }
+    tab = rbind(ptab, stab)
+    colnames(tab) = ptab.cnames
+    tab = round(tab, 4)
+    m = data.frame(matrix(0, nrow(tab), ncol(tab)), stringsAsFactors = FALSE)
+    for (i in 1:nrow(tab)) {
+        for (j in 1:4) {
+            if ((j == 4) & (tab[i, j] < 1e-03)) {
+                m[i, j] = "< 0.001"
+            }
+            else {
+                m[i, j] = sprintf("%3.3f", tab[i, j])
+            }
+        }
+    }
+    colnames(m) = colnames(tab)
+    rownames(m) = rownames(tab)
+    tab = m
+    tab2 = rbind(c(ptab.cnames), tab[1:nrow(ptab), ])
+    if (nrow(stab) > 0) {
+        tab2 = rbind(tab2, c(stab.cnames), tab[(nrow(ptab) + 
+            1):nrow(tab), ])
+    }
+    if (nrow(stab)) {
+        rownames(tab2)[(nrow(ptab) + 2)] = "B. smooth terms"
+    }
+    rownames(tab2)[1] = "A. parametric coefficients"
+    for (i in 1:nrow(tab2)) {
+        if (tab2[i, 4] == "0") 
+            tab2[i, 4] = "< 0.0001"
+        if (length(grep("\\.", tab2[i, 2])) == 0) 
+            tab2[i, 2] = paste(tab2[i, 2], ".0000", sep = "")
+    }
+    print(xtable::xtable(tab2, caption = caption, label = label, 
+        align = "lrrrr"), include.colnames = FALSE, hline.after = c(0, 
+        (nrow(ptab) + 1), nrow(tab2)), ...)
+}
+```
+
+Latex table:
+```{r}
+options(xtable.comment = FALSE)
+gamtabs2(Final.ord_trim)
+```
+
+
+# Session info
+```{r}
+sessionInfo()
+```
+

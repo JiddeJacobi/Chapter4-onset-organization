@@ -1,0 +1,388 @@
+---
+title: "IPI"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library("tidyr")
+library("dplyr")
+library("stringr")
+library("visreg")
+library("ggplot2")
+library("mgcv")
+library("itsadug")
+library("plyr")
+```
+
+# Introduction
+From the c-center hypothesis it follows that onsets are coordinated inphase with the following vowel, meaning that they are initiated roughly around the same time. On the other hand, multiple consonants in an onset are also coordinated antiphase with each other (i.e. sequential initiation). To cope with these competing relations, the leftmost C gets shifted towards the left and the rightmost C gets shifted towards the right (with respect to the following vowel) in complex onsets. In this way, the average onset of the two C's is still initiated at the same time as the vowel, whereas they are also still coordinated in an antiphase relation with each other. Our hypothesis is that PD patients will show a stronger preference for the inphase relationship, coming at the cost of the antiphase relationship. In our data we've included three singular onsets /p/, /m/ and /x/ and four complex onsets: /sp/, /sm/, /sx/ and /spr/. The variable 'time.lag.norm' is the normalized time lag between the offset of the leftmost C and the onset of the rightmost C. If our hypothesis is correct the lag between the C's should be lower for the PD group in comparison with the controls.
+
+
+## Read data
+```{r save data}
+df <- readRDS("C:/Users/Jidde/Desktop/analysis/data/modelling_data_CC.rds")
+```
+
+## Clean data
+Remove all the rows that have NA in the dependent variable and drop 'empty' levels, convert variables to factors and create trimmed dataset.
+```{r remove NA}
+df$subj <- as.factor(df$subj)
+
+df <- df[complete.cases(df$time.lag.norm),]
+df <- droplevels(df)
+
+# Sort data
+df <- df[order(df$subj, df$recording.no),]
+
+# convert to factors/numeric
+df$prompt <- as.factor(df$prompt)
+df$condition <- as.factor(df$condition)
+
+# remove all the recordings without a speech rate measure:
+# df <- df %>% drop_na(duration.tt)
+
+# remove participants with only a few datapoints
+#remove <- c("PD19", "CTRL19")
+#df.trim <- df[! df$subj %in% remove, ]
+#df.trim <- droplevels(df.trim)
+
+
+# create df without sx
+#df.trim <- df.trim[! df.trim$cluster == "sx", ]
+#df.trim <- droplevels(df.trim)
+#levels(df.trim$cluster)
+
+df$group <- revalue(df$group, c("CTRL"="typical"))
+df$group<- relevel(df$group, ref = "PD")
+
+# create df without spr
+df.nospr <- df[! df$cluster == "spr", ]
+df.nospr <- droplevels(df.nospr)
+levels(df.nospr$cluster)
+df.nospr$cluster <- relevel(df.nospr$cluster, ref = "sm")
+
+df.nospr$condition <- recode_factor(df.nospr$condition, C = "singleton", 
+                                CC = "cluster")
+
+df.nospr$condition <- recode_factor(df.nospr$condition, male = "male",  
+                                    female = "female")
+
+
+
+# merge /sm/ and /sp/
+df.nospr$poa <- ifelse(df.nospr$cluster == "sx","C2lingual","C2bilabial")
+df.nospr$poa <- as.factor(df.nospr$poa)
+table(df.nospr$poa, df.nospr$cluster)
+```
+
+
+Create ordered factors:
+```{r}
+df.nospr$group.ord <- as.ordered(df.nospr$group) 
+contrasts(df.nospr$group.ord) <- "contr.treatment" 
+
+df.nospr$cluster.ord <- as.ordered(df.nospr$cluster) 
+contrasts(df.nospr$cluster.ord) <- "contr.treatment" 
+
+df.nospr$gender.ord <- as.ordered(df.nospr$gender) 
+contrasts(df.nospr$gender.ord) <- "contr.treatment" 
+```
+
+
+Create binary dummy variables:
+```{r}
+df.nospr$IsTP <- (df.nospr$group == "typical")*1
+```
+
+
+## Plot data
+```{r}
+ggplot(df.nospr, aes(x=group, y=time.lag.norm, fill=group))  + geom_violin() + geom_boxplot(width=.2) + labs(y = "IPI (ms)") +  scale_fill_manual(values=c("#ffbfbf", "#bfd8bf")) + theme_bw() 
+```
+
+
+# GAM models for CC lag analysis (coarticulation)
+If indeed patients would show a stronger preference for inphase coordination, this would mean that they would produce the C gestures in the syllable's onset closer together in time. For this, we look at the lag between the gestural offset of the leftmost C and the gestural onset of the righmost C in complex clusters.
+
+## Hypothesis testing
+
+Creat base model:
+```{r mbase, cache=T}
+summary(mbase <- bam(time.lag.norm ~ s(subj,bs='re'), data=df.nospr))
+```
+
+
+Adding group as fixed effect:
+```{r mhypo, cache=T}
+summary(mhypo <- bam(time.lag.norm ~ group + s(subj,bs='re'), data=df.nospr))
+gam.check(mhypo)
+```
+Looks a bit off.
+
+Fit with scat:
+```{r scat, cache=T}
+summary(mhypo_scat <- bam(time.lag.norm ~ group + s(subj,bs='re'), data=df.nospr, family = "scat", discrete = T))
+gam.check(mhypo_scat)
+```
+Better.
+
+Compare model with and without group using scaled-t:
+```{r group, cache=T}
+summary(mbase_scat <- bam(time.lag.norm ~ s(subj,bs='re'), method = "ML", data=df.nospr))
+summary(mhypo_scatML <- bam(time.lag.norm ~ group + s(subj,bs='re'), method = "ML", data=df.nospr))
+compareML(mbase_scat, mhypo_scatML)
+```
+No improv, AIC diff is -0.51.
+
+Model criticism, trimming:
+```{r}
+df.nospr2 <- df.nospr[abs(scale(resid(mhypo_scat))) < 2.5, ] # trim model
+(1 - (nrow(df.nospr2))/nrow(df.nospr)) * 100
+```
+0.6% removed.
+
+Refit:
+```{r hypotrim, cache=T}
+summary(mhypo_scat_trim <- bam(time.lag.norm ~ group + s(subj,bs='re'), data=df.nospr2, family = "scat", discrete = T))
+gam.check(mhypo_scat_trim)
+```
+OK.
+
+## Exploratory analysis
+
+Adding cluster as fixed effect:
+```{r ex2, cache=T}
+summary(ex1 <- bam(time.lag.norm ~ group + s(subj,bs='re'), data=df.nospr, method = "ML", family = "scat"))
+summary(ex2 <- bam(time.lag.norm ~ group + cluster + s(subj,bs='re'), data=df.nospr, method = "ML", family = "scat"))
+compareML(ex1,ex2)
+```
+Improves: AIC difference: 181.43.
+
+Add random slopes for cluster:
+```{r ex3, cache=T}
+summary(ex3 <- bam(time.lag.norm ~ group + cluster + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, family = "scat"))
+```
+Yes.
+
+Adding cluster:group as fixed effect:
+```{r ex4, cache=T}
+summary(ex3ML <- bam(time.lag.norm ~ group + cluster + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, method = "ML", family = "scat"))
+
+summary(ex4 <- bam(time.lag.norm ~ group*cluster + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, method = "ML", family = "scat"))
+compareML(ex3ML,ex4)
+```
+No improvement.
+
+
+Add recording.no
+```{r ex5, cache=T}
+summary(ex5 <- bam(time.lag.norm ~ group + cluster + s(recording.no) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, method = "ML", family = "scat"))
+compareML(ex3ML, ex5)
+```
+Yes.
+
+Separate for group?
+```{r ex6, cache=T}
+summary(ex6 <- bam(time.lag.norm ~ group + cluster + s(recording.no) + s(recording.no, by = IsTP) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, family = "scat"), discrete = T, nthreads = 2)
+```
+No.
+
+Add random smooth?
+```{r ex7, cache=T}
+summary(ex7 <- bam(time.lag.norm ~ group + cluster + s(recording.no) + s(subj, cluster, bs ="re") + s(recording.no, subj, bs="fs", m =1), data=df.nospr, family = "scat"), discrete = T, nthreads = 2)
+```
+Yes, but recording.no is not sign. anymore.
+
+Check group diff once more:
+```{r ex8, cache=T}
+summary(ex8 <- bam(time.lag.norm ~ group + cluster + s(recording.no) + s(recording.no, by = IsTP)  + s(subj, cluster, bs ="re") + s(recording.no, subj, bs="fs", m =1), data=df.nospr, family = "scat"), discrete = T, nthreads = 2)
+```
+No difference.
+
+
+Gender?
+```{r ex9, cache=T}
+summary(ex9 <- bam(time.lag.norm ~ group + cluster + gender + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, method = "ML", family = "scat"))
+
+compareML(ex3ML, ex9, suggest.report = TRUE)
+```
+Yes.
+
+
+In interaction with group?
+```{r ex10, cache=T}
+summary(ex10 <- bam(time.lag.norm ~ group*gender + cluster + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, method = "ML", family = "scat"))
+
+compareML(ex9, ex10, suggest.report = TRUE)
+```
+No.
+
+Add age?
+```{r ex11, cache=T}
+summary(ex11 <- bam(time.lag.norm ~ group + cluster + gender + s(age) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, method = "ML", family = "scat"))
+
+compareML(ex9, ex11, suggest.report = TRUE)
+```
+Yes.
+
+In interaction with group?
+```{r ex12, cache=T}
+summary(ex12 <- bam(time.lag.norm ~ group + cluster + gender + s(age) + s(age, by = IsTP) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, family = "scat", discrete = T, nthreads = 2))
+```
+Yes.
+
+Check once more whether we need gender:
+```{r gender, cache=T}
+summary(ex13 <- bam(time.lag.norm ~ group + cluster + s(age) + s(age, by = IsTP) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, family = "scat", method = "ML"))
+
+summary(ex12ML <- bam(time.lag.norm ~ group + cluster + gender + s(age) + s(age, by = IsTP) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, family = "scat", method = "ML"))
+
+compareML(ex13, ex12ML)
+```
+We don't need gender after all.
+
+Check once more whether we need interaction between group and cluster:
+```{r ex14, cache=T}
+summary(ex14 <- bam(time.lag.norm ~ group*cluster + s(age) + s(age, by = IsTP) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, family = "scat", method = "ML"))
+
+compareML(ex13, ex14)
+```
+We don't need it.
+
+Separate constant from non-linear effect of the difference smooth over age using an ordered factor:
+```{r}
+summary(ex15 <- bam(time.lag.norm ~ group.ord + cluster + s(age) + s(age, by = group.ord) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr, family = "scat", discrete = T, nthreads = 2))
+```
+Only a non-linear diff.
+
+# Check assumptions final model
+
+Refit final model using REML:
+```{r}
+mFinal <- ex15
+```
+
+
+Check:
+```{r}
+gam.check(mFinal)
+```
+Looks excellent.
+
+
+Model criticism, trimming:
+```{r }
+df.nospr3 <- df.nospr[abs(scale(resid(mFinal))) < 2.5, ] # trim model
+(1 - (nrow(df.nospr3))/nrow(df.nospr)) * 100
+```
+1.4% removed.
+
+Refit:
+```{r}
+summary(mFinal_trim <- bam(time.lag.norm ~ group.ord + cluster + s(age) + s(age, by = group.ord) + s(subj,bs='re') + s(subj, cluster, bs ="re"), data=df.nospr3, family = "scat", discrete = T, nthreads = 2))
+```
+Same pattern.
+
+Visualize:
+```{r}
+plot_smooth(mFinal_trim, view = "age", plot_all = "group.ord", ylab = "IPI (ms)", rm.ranef=TRUE, col=c("red", "darkgreen"),rug = F)
+```
+
+
+# Latex table
+
+Latex table function:
+```{r}
+gamtabs2 <- function (model, caption = " ", label = "tab.gam", 
+    pnames = NA, snames = NA, ptab = NA, stab = NA, ...) 
+{
+    if (!requireNamespace("xtable", quietly = TRUE)) {
+        stop("Package 'xtable' needed for this function to work. Please install it.", 
+            call. = FALSE)
+    }
+    sum.gam <- model
+    if (!inherits(model, "summary.gam")) {
+        sum.gam <- summary(model)
+    }
+    if (is.na(ptab[1])) {
+        ptab = as.data.frame(sum.gam$p.table, stringsAsFactors = FALSE)
+    }
+    if (is.na(stab[1])) {
+        stab = as.data.frame(sum.gam$s.table, stringsAsFactors = FALSE)
+    }
+    if (!is.na(pnames[1])) {
+        rownames(ptab) = pnames
+    }
+    if (!is.na(snames[1])) {
+        rownames(stab) = snames
+    }
+    colnames(ptab)[4] = "p-value"
+    colnames(ptab)[3] = "t-value"
+    ptab.cnames = colnames(ptab)
+    stab.cnames = colnames(stab)
+    stab.cnames[3] = "F-value"
+    colnames(ptab) = c("A", "B", "C", "D")
+    if (ncol(stab) != 0) {
+        colnames(stab) = colnames(ptab)
+    }
+    tab = rbind(ptab, stab)
+    colnames(tab) = ptab.cnames
+    tab = round(tab, 4)
+    m = data.frame(matrix(0, nrow(tab), ncol(tab)), stringsAsFactors = FALSE)
+    for (i in 1:nrow(tab)) {
+        for (j in 1:4) {
+            if ((j == 4) & (tab[i, j] < 1e-03)) {
+                m[i, j] = "< 0.001"
+            }
+            else {
+                m[i, j] = sprintf("%3.3f", tab[i, j])
+            }
+        }
+    }
+    colnames(m) = colnames(tab)
+    rownames(m) = rownames(tab)
+    tab = m
+    tab2 = rbind(c(ptab.cnames), tab[1:nrow(ptab), ])
+    if (nrow(stab) > 0) {
+        tab2 = rbind(tab2, c(stab.cnames), tab[(nrow(ptab) + 
+            1):nrow(tab), ])
+    }
+    if (nrow(stab)) {
+        rownames(tab2)[(nrow(ptab) + 2)] = "B. smooth terms"
+    }
+    rownames(tab2)[1] = "A. parametric coefficients"
+    for (i in 1:nrow(tab2)) {
+        if (tab2[i, 4] == "0") 
+            tab2[i, 4] = "< 0.0001"
+        if (length(grep("\\.", tab2[i, 2])) == 0) 
+            tab2[i, 2] = paste(tab2[i, 2], ".0000", sep = "")
+    }
+    print(xtable::xtable(tab2, caption = caption, label = label, 
+        align = "lrrrr"), include.colnames = FALSE, hline.after = c(0, 
+        (nrow(ptab) + 1), nrow(tab2)), ...)
+}
+```
+
+
+Latex table:
+```{r}
+options(xtable.comment = FALSE)
+gamtabs2(mFinal_trim)
+```
+
+
+# Session info
+```{r}
+sessionInfo()
+```

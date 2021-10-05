@@ -1,0 +1,399 @@
+---
+title: "Consonant durations in onset"
+output: 
+  html_document: 
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+  
+  
+  ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data preprocessing
+
+## Load required packages
+```{r}
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(car)
+library(visreg)
+library(lmerTest)
+library(ggplot2)
+library(mgcv)
+library(itsadug)
+```
+
+
+
+## Read data
+```{r save data}
+df <- readRDS("C:/Users/Jidde/Desktop/analysis/data/modelling_data.rds")
+df <- rename(df, onset_type = condition)
+```
+
+
+### Tweak data
+```{r}
+# Change order of levels in cluster
+df$cluster <- relevel(df$cluster, ref = "sp")
+df$subj <- as.factor(df$subj)
+df$dur <- as.numeric(df$dur)
+df <- drop_na(df, dur)
+df$onset_type <- relevel(df$onset_type, ref = "C")
+
+
+
+df.onset.sp <- df[df$seg == "p" & df$cluster == "sp",]
+df.onset.sm <- df[df$seg == "m",]
+df.onset.sx <- df[df$seg == "X",]
+
+df.onset <- rbind(df.onset.sp, df.onset.sm, df.onset.sx) # drop spr cluster
+rm(df.onset.sp, df.onset.sm, df.onset.sx)
+
+table(df.onset$subj, df.onset$trial)
+
+df.onset.s <- df[df$seg == "s" & df$onset_type == "CC",]
+
+df.onset$onset_type <- recode_factor(df.onset$onset_type, C = "singleton", 
+                                CC = "cluster")
+
+df.onset$group <- recode_factor(df.onset$group, CTRL = "typical")
+df.onset$group<- relevel(df.onset$group, ref = "PD")
+```
+
+
+Create ordered factor:
+```{r}
+df.onset$group.ord <- as.ordered(df.onset$group) 
+contrasts(df.onset$group.ord) <- "contr.treatment" 
+
+df.onset$gender.ord <- as.ordered(df.onset$gender) 
+contrasts(df.onset$gender.ord) <- "contr.treatment" 
+```
+
+
+Create binary dummy variables:
+```{r}
+df.onset$IsTP <- (df.onset$group == "typical")*1
+```
+
+Visualize:
+```{r}
+dodge = .5
+dodge <- position_dodge(width = 0.9)
+
+ggplot(df.onset, aes(x=group, y=dur, fill=onset_type)) + geom_violin() + geom_boxplot(width=.2, position = dodge) + labs(y = "duration prevocalic consonant (ms)") + scale_fill_manual(values=c("#bfd8bf", "#bfd4ff")) + theme_bw()
+dodge <- position_dodge(width = 0.9)
+```
+
+
+# Duration of prevocalic consonant
+
+Fitting first model:
+```{r m, cache = T}
+summary(m <- bam(dur ~ s(subj, bs='re'), data=df.onset, method = "ML"))
+```
+
+Adding onset_type as fixed effect:
+```{r m1, cache = T}
+summary(m1 <- bam(dur ~  onset_type + s(subj, bs='re'), data=df.onset, method = "ML"))
+compareML(m, m1)
+```
+Sign. improvement.
+
+Add random slopes over onset_type:
+```{r}
+summary(m2REML <- bam(dur ~ onset_type + s(onset_type, bs = "fs", m = 1), data=df.onset , method = "REML"))
+```
+
+
+
+Adding random slopes for onset_type:
+```{r m2reml, cache = T}
+summary(m2REML <- bam(dur ~ onset_type + s(subj, bs='re') +  s(subj, onset_type, bs = "re"), data=df.onset , method = "REML"))
+```
+Sign. improvement.
+
+Adding group as fixed effect:
+```{r m3ML, cache = T}
+summary(m2ML <- bam(dur ~ onset_type + s(subj, bs='re') + s(subj, onset_type, bs = "re"), data=df.onset , method = "ML"))
+
+summary(m3ML <- bam(dur ~ group  + onset_type + s(subj, bs='re') + s(subj, onset_type, bs = "re"), data=df.onset , method = "ML"))
+
+compareML(m2ML, m3ML)
+```
+No improv.
+
+Adding interaction as fixed effect:
+```{r m4ml, cache = T}
+summary(m4ML <- bam(dur ~ group*onset_type + s(subj, bs='re') + s(subj, onset_type, bs = "re"), data=df.onset , method = "ML"))
+compareML(m2ML, m4ML)
+```
+No improvement.
+
+Add cluster
+```{r m5ml, cache = T}
+summary(m5ML <- bam(dur ~ onset_type + cluster + s(subj, bs='re') + s(subj, onset_type, bs = "re"), data=df.onset , method = "ML"))
+compareML(m2ML, m5ML)
+```
+Sign. improvement.
+
+
+Add random slopes for cluster:
+```{r m6, cache = T}
+summary(m6 <- bam(dur ~ onset_type + cluster + s(subj, bs='re') + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset))
+```
+Imrpov.
+
+Adding onset_type*cluster as fixed effect:
+```{r m7, cache = T}
+summary(m6ML <- bam(dur ~ onset_type + cluster + s(subj, bs='re') + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset , method = "ML"))
+
+summary(m7 <- bam(dur ~ onset_type*cluster + s(subj, bs='re') + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset , method = "ML"))
+
+compareML(m6ML, m7)
+```
+Sign. improv.
+
+
+Adding duration.tt fixed effect:
+```{r m8, cache = T}
+df.onset$duration.tt <- df.onset$duration.tt - mean(df.onset$duration.tt) # center continues variable
+summary(m8 <- bam(dur ~ onset_type*cluster + s(duration.tt) + s(subj, bs='re') + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), method = "ML", data=df.onset))
+compareML(m7, m8)
+```
+Sign. improvement.
+
+Add slopes:
+```{r m9, cache = T}
+summary(m9 <- bam(dur ~ onset_type*cluster + s(duration.tt) + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re")  + s(duration.tt, subj, bs = "fs", m =1), data=df.onset))
+```
+Not required.
+
+Check if there's a group difference:
+```{r m9group, cache = T}
+summary(m9group <- bam(dur ~ onset_type*cluster + s(duration.tt) + s(duration.tt, by = IsTP) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset))
+```
+Yes.
+
+Add appropriate random smooths:
+```{r m9groslo, cache = T}
+summary(m9group_slope <- bam(dur ~ onset_type*cluster + s(duration.tt) + s(duration.tt, by = IsTP) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re") + s(duration.tt, subj, bs = "fs", m =1) + s(duration.tt, subj, by = IsTP, bs = "fs", m =1), data=df.onset))
+```
+Not sign. anymore.
+
+Adding recording.no  as fixed effect:
+```{r m10, cache = T}
+summary(m9groupML <- bam(dur ~ group.ord + onset_type*cluster + s(duration.tt) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+summary(m10 <- bam(dur ~ group.ord + onset_type*cluster + s(duration.tt)  + s(recording.no) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+compareML(m9groupML, m10)
+```
+No improvement.
+
+
+Recording.no separate for group?
+```{r m11, cache = T}
+summary(m11 <- bam(dur ~ group.ord + onset_type*cluster + s(duration.tt) + s(recording.no) + s(recording.no, by = IsTP) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset))
+```
+No.
+
+
+Adding gender as fixed effect:
+```{r m12, cache = T}
+summary(m11ML <- bam(dur ~ group.ord + onset_type*cluster + s(duration.tt) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+summary(m12 <- bam(dur ~ group.ord + onset_type*cluster + s(duration.tt) + gender + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+compareML(m11ML, m12)
+```
+No sign. improvement.
+
+In interaction with group?
+```{r m12inter, cache = T}
+summary(m12inter <- bam(dur ~ group.ord*gender + onset_type*cluster + s(duration.tt) + gender + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+compareML(m11ML, m12inter)
+```
+No sign. improvement.
+
+
+Adding age fixed effect:
+```{r m13, cache = T}
+df.onset$age <- df.onset$age - mean(df.onset$age) # center continues variable
+
+summary(m13 <- bam(dur ~ group.ord + onset_type*cluster + s(duration.tt) + s(age) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+compareML(m11ML, m13)
+```
+No sign. improvement.
+
+In interaction with group?
+```{r m13inter, cache = T}
+summary(m13inter <- bam(dur ~ onset_type*cluster + s(duration.tt) + s(age) + s(age, IsTP) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset))
+```
+No sign. improvement.
+
+
+Adding interaction group*cluster 
+```{r m14, cache = T}
+summary(m14 <- bam(dur ~ group.ord*cluster + onset_type*cluster + s(duration.tt) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+compareML(m11ML, m14)
+```
+No improv.
+
+Adding interaction group*onset_type
+```{r m15, cache = T}
+summary(m15 <- bam(dur ~ group.ord*onset_type + onset_type*cluster + s(duration.tt) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+compareML(m11ML, m15)
+```
+No improv.
+
+Add three-way interaction:
+```{r m16, cache = T}
+summary(m16 <- bam(dur ~ group.ord*onset_type*cluster + s(subj, bs = "re") + s(duration.tt) + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "ML"))
+
+compareML(m11ML, m16)
+```
+Yes.
+
+
+### Check assumptions
+
+Refit using REML:
+```{r m16reml, cache = T}
+summary(m16REML <- bam(dur ~ group.ord*onset_type*cluster + s(subj, bs = "re") + s(duration.tt) + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, method = "REML"))
+```
+
+```{r}
+gam.check(m16REML)
+```
+Doesn't look very well, skewed right
+
+Fit with loglink
+```{r m16log, cache = T}
+summary(m16REML_log <- bam(dur ~ group.ord*onset_type*cluster + s(duration.tt) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset, family =Gamma(link=log)))
+
+gam.check(m16REML_log) 
+```
+Still doesn't look great.
+
+Model criticism, trimming:
+```{r}
+df.onset2 <- df.onset[abs(scale(resid(m16REML_log))) < 2.5, ] # trim model
+(1 - (nrow(df.onset2))/nrow(df.onset)) * 100
+```
+3.0% removed
+
+Refit:
+```{r m16logtrim, cache = T}
+summary(m16REML_log_trim <- bam(dur ~ group*onset_type*cluster + s(duration.tt) + s(subj, bs = "re") + s(subj, onset_type, bs = "re") + s(subj, cluster, bs = "re"), data=df.onset2, family =Gamma(link=log)))
+
+gam.check(m16REML_log_trim)
+```
+Looks fine.
+
+Visualize:
+```{r}
+plot(m16REML_log_trim, select = 1, shade = T, rug = F, xlab = "speech interval duration (ms)", ylab = "duration prevocalic C (ms)")
+abline(h=0)
+
+par(mar = c(4.5, 0.1, 0.1, 0.1)) # Set the margin on all sides to 2
+plot_parametric(m16REML_log_trim, cond = list(group = "PD", cluster = c("sp")), pred=list(onset_type = c("singleton", "cluster")), main = "", xlim=c(2.5,4), xlab = "duration prevocalic consonant (ms)")
+plot_parametric(m16REML_log_trim, cond = list(group = "PD", cluster = c("sm")), pred=list(onset_type = c("singleton", "cluster")), main = "", xlim=c(2.5,4), xlab = "duration prevocalic consonant (ms)")
+plot_parametric(m16REML_log_trim, cond = list(group = "PD", cluster = c("sx")), pred=list(onset_type = c("singleton", "cluster")), main = "", xlim=c(2.5,4), xlab = "duration prevocalic consonant (ms)")
+plot_parametric(m16REML_log_trim, cond = list(group = "typical", cluster = c("sp")), pred=list(onset_type = c("singleton", "cluster")), main = "", xlim=c(2.5,4), xlab = "duration prevocalic consonant (ms)")
+plot_parametric(m16REML_log_trim, cond = list(group = "typical", cluster = c("sm")), pred=list(onset_type = c("singleton", "cluster")), main = "", xlim=c(2.5,4), xlab = "duration prevocalic consonant (ms)", ylim=c(1,-1))
+plot_parametric(m16REML_log_trim, cond = list(group = "typical", cluster = c("sx")), pred=list(onset_type = c("singleton", "cluster")), main = "", xlim=c(2.5,4), xlab = "duration prevocalic consonant (ms)", ylim=c(1,-1))
+```
+
+Latex table function:
+```{r}
+gamtabs2 <- function (model, caption = " ", label = "tab.gam", 
+    pnames = NA, snames = NA, ptab = NA, stab = NA, ...) 
+{
+    if (!requireNamespace("xtable", quietly = TRUE)) {
+        stop("Package 'xtable' needed for this function to work. Please install it.", 
+            call. = FALSE)
+    }
+    sum.gam <- model
+    if (!inherits(model, "summary.gam")) {
+        sum.gam <- summary(model)
+    }
+    if (is.na(ptab[1])) {
+        ptab = as.data.frame(sum.gam$p.table, stringsAsFactors = FALSE)
+    }
+    if (is.na(stab[1])) {
+        stab = as.data.frame(sum.gam$s.table, stringsAsFactors = FALSE)
+    }
+    if (!is.na(pnames[1])) {
+        rownames(ptab) = pnames
+    }
+    if (!is.na(snames[1])) {
+        rownames(stab) = snames
+    }
+    colnames(ptab)[4] = "p-value"
+    colnames(ptab)[3] = "t-value"
+    ptab.cnames = colnames(ptab)
+    stab.cnames = colnames(stab)
+    stab.cnames[3] = "F-value"
+    colnames(ptab) = c("A", "B", "C", "D")
+    if (ncol(stab) != 0) {
+        colnames(stab) = colnames(ptab)
+    }
+    tab = rbind(ptab, stab)
+    colnames(tab) = ptab.cnames
+    tab = round(tab, 4)
+    m = data.frame(matrix(0, nrow(tab), ncol(tab)), stringsAsFactors = FALSE)
+    for (i in 1:nrow(tab)) {
+        for (j in 1:4) {
+            if ((j == 4) & (tab[i, j] < 1e-03)) {
+                m[i, j] = "< 0.001"
+            }
+            else {
+                m[i, j] = sprintf("%3.3f", tab[i, j])
+            }
+        }
+    }
+    colnames(m) = colnames(tab)
+    rownames(m) = rownames(tab)
+    tab = m
+    tab2 = rbind(c(ptab.cnames), tab[1:nrow(ptab), ])
+    if (nrow(stab) > 0) {
+        tab2 = rbind(tab2, c(stab.cnames), tab[(nrow(ptab) + 
+            1):nrow(tab), ])
+    }
+    if (nrow(stab)) {
+        rownames(tab2)[(nrow(ptab) + 2)] = "B. smooth terms"
+    }
+    rownames(tab2)[1] = "A. parametric coefficients"
+    for (i in 1:nrow(tab2)) {
+        if (tab2[i, 4] == "0") 
+            tab2[i, 4] = "< 0.0001"
+        if (length(grep("\\.", tab2[i, 2])) == 0) 
+            tab2[i, 2] = paste(tab2[i, 2], ".0000", sep = "")
+    }
+    print(xtable::xtable(tab2, caption = caption, label = label, 
+        align = "lrrrr"), include.colnames = FALSE, hline.after = c(0, 
+        (nrow(ptab) + 1), nrow(tab2)), ...)
+}
+```
+
+Latex table:
+```{r}
+options(xtable.comment = FALSE)
+gamtabs2(m16REML_log_trim)
+```
+
+# Session info
+```{r}
+sessionInfo()
+```
+
