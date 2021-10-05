@@ -27,8 +27,8 @@ library("ez")
 
 ## Read data
 ```{r read}
-df <- read.csv("../data/c-center_16th_Sep.csv", header = TRUE, sep = ",")
-load("../data/speech_rate.Rda")
+df <- read.csv("C:/Users/Jidde/Desktop/analysis/data/c-center_16th_Sep2.csv", header = TRUE, sep = ",")
+load("C:/Users/Jidde/Desktop/analysis/data/speech_rate.Rda")
 df_sr <- drop_na(df_sr)
 ```
 
@@ -115,6 +115,10 @@ Remove unreliable /sx/ segmentation of PD25.
 df <- df[!(df$subj == "PD25" & df$cluster == "sx"),]
 ```
 
+Change level of group factor:
+```{r}
+df$group <- recode_factor(df$group, CTRL = "TP")
+```
 
 # Preparing data for within cluster analysis
 
@@ -152,16 +156,18 @@ sp.CC <- df %>%
 
 
 sp.C1.plot <- ggplot(sp.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
-print(sp.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sp.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("seagreen4", "coral2")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
 
-cor.test(sp.CC$time.lag.norm, sp.CC$dur.C1.norm)
+cor.test(sp.CC[sp.CC$group == "TP",]$time.lag.norm, sp.CC[sp.CC$group == "TP",]$dur.C1.norm)
+cor.test(sp.CC[sp.CC$group == "PD",]$time.lag.norm, sp.CC[sp.CC$group == "PD",]$dur.C1.norm)
+
 
 
 sp.C2.plot <- ggplot(sp.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
-print(sp.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C2")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sp.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("seagreen4", "coral2")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C2")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
 
-cor.test(sp.CC$time.lag.norm, sp.CC$dur.C2.norm)
-
+cor.test(sp.CC[sp.CC$group == "TP",]$time.lag.norm, sp.CC[sp.CC$group == "TP",]$dur.C2.norm)
+cor.test(sp.CC[sp.CC$group == "PD",]$time.lag.norm, sp.CC[sp.CC$group == "PD",]$dur.C2.norm)
 
 rm(sp.C1.plot, sp.C2.plot)
 
@@ -206,11 +212,17 @@ sm.CC <- df %>%
 
 
 sm.C1.plot <- ggplot(sm.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
-print(sm.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sm.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("seagreen4", "coral2")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+
+cor.test(sm.CC[sm.CC$group == "TP",]$time.lag.norm, sm.CC[sm.CC$group == "TP",]$dur.C1.norm)
+cor.test(sm.CC[sm.CC$group == "PD",]$time.lag.norm, sm.CC[sm.CC$group == "PD",]$dur.C1.norm)
+
 
 sm.C2.plot <- ggplot(sm.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
-print(sm.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sm.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("seagreen4", "coral2")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C2")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
 
+cor.test(sm.CC[sm.CC$group == "TP",]$time.lag.norm, sm.CC[sm.CC$group == "TP",]$dur.C2.norm)
+cor.test(sm.CC[sm.CC$group == "PD",]$time.lag.norm, sm.CC[sm.CC$group == "PD",]$dur.C2.norm)
 
 rm(sm.C1.plot, sm.C2.plot)
 rm(offset.s)
@@ -258,10 +270,16 @@ sx.CC <- df %>%
 
 
 sx.C1.plot <- ggplot(sx.CC, aes(x = time.lag.norm, y = dur.C1.norm, color = group, shape = group)) + geom_point(size=2)
-print(sx.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sx.C1.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("seagreen4", "coral2")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+
+cor.test(sx.CC[sx.CC$group == "TP",]$time.lag.norm, sx.CC[sx.CC$group == "TP",]$dur.C1.norm)
+cor.test(sx.CC[sx.CC$group == "PD",]$time.lag.norm, sx.CC[sx.CC$group == "PD",]$dur.C1.norm)
 
 sx.C2.plot <- ggplot(sx.CC, aes(x = time.lag.norm, y = dur.C2.norm, color = group, shape = group)) + geom_point(size=2)
-print(sx.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("coral2", "seagreen4")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C1")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+print(sx.C2.plot + scale_shape_manual(values = c(0, 2)) + scale_colour_manual(values = c("seagreen4", "coral2")) + theme_bw() + labs(x = "normalized IPI", y = "normalized duration C2")) + geom_smooth(method='lm', se = FALSE) +   xlim(-0.15, 0.3) + ylim(0, 0.3)
+
+cor.test(sx.CC[sx.CC$group == "TP",]$time.lag.norm, sx.CC[sx.CC$group == "TP",]$dur.C2.norm)
+cor.test(sx.CC[sx.CC$group == "PD",]$time.lag.norm, sx.CC[sx.CC$group == "PD",]$dur.C2.norm)
 
 rm(sx.C1.plot, sx.C2.plot)
 
